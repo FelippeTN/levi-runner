@@ -3,3 +3,4 @@ dist/
 .venv/
 ranking.db
 levi-runner-local.zip
+__pycache__/

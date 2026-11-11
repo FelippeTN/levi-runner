@@ -3,6 +3,7 @@
 import { AnimationMixer, Group, LoopOnce, LoopRepeat, Vector3 } from "three";
 import { LANES, MAX_SPEED, START_SPEED } from "./config.js";
 import { Phase } from "./game.js";
+import { skinner } from "./skins.js";
 import { clamp, qy, qz } from "./util.js";
 
 export const JUMP_V = 9.5;
@@ -19,6 +20,13 @@ export class Player {
   /** sombra redonda no chão (definida pelo main) */
   blob = null;
   yaw = 0;
+  /** provador da loja: balança devagar de um lado para o outro mostrando a skin */
+  showcase = false;
+  #showcaseT = 0;
+  /** giro em torno do qual o provador balança (de costas para mostrar o que vai nas costas) */
+  #showcaseYaw = 0;
+  /** veste pintura e acessório (existe depois que o modelo carrega) */
+  wear = null;
 
   constructor() {
     this.root.scale.setScalar(MODEL_SCALE);
@@ -39,6 +47,16 @@ export class Player {
     this.floor = 0;
     /** escala vertical do squash & stretch (1 = normal) */
     this.squash = 1;
+    /** segundos atravessando obstáculos depois que a reserva pagou a batida */
+    this.invuln = 0;
+    /** segundos de ímã de moedas */
+    this.magnet = 0;
+  }
+
+  setShowcase(on, back = false) {
+    this.showcase = on;
+    this.#showcaseT = 0;
+    this.#showcaseYaw = back ? Math.PI * 0.8 : 0;
   }
 
   get x() {
@@ -62,6 +80,7 @@ export class Player {
       }
     });
     this.root.add(gltf.scene);
+    this.wear = skinner(gltf.scene);
     this.mixer = new AnimationMixer(gltf.scene);
     this.actions = Object.fromEntries(gltf.animations.map((clip) => [clip.name, this.mixer.clipAction(clip)]));
     this.clip = null;
@@ -133,6 +152,9 @@ export class Player {
       this.slide = Math.max(this.slide - dt, 0);
       this.land = Math.max(this.land - dt, 0);
       this.stumble = Math.max(this.stumble - dt, 0);
+      this.invuln = Math.max(this.invuln - dt, 0);
+      this.magnet = Math.max(this.magnet - dt, 0);
+      game.wallet.tick(game.speed * dt);
     } else if (game.phase === Phase.Dying) {
       game.dying += dt;
       if (game.dying > 1.3) game.phase = Phase.Over;
@@ -145,7 +167,12 @@ export class Player {
     t.position.y = this.y;
     // de frente para a câmera no menu, de costas correndo
     const yaw = game.phase === Phase.Ready ? 0 : Math.PI;
-    this.yaw += (yaw - this.yaw) * Math.min(8 * dt, 1);
+    if (this.showcase && game.phase === Phase.Ready) {
+      this.#showcaseT += dt;
+      this.yaw += (this.#showcaseYaw + 0.7 * Math.sin(this.#showcaseT * 0.9) - this.yaw) * Math.min(4 * dt, 1);
+    } else this.yaw += (yaw - this.yaw) * Math.min(8 * dt, 1);
+    // pisca enquanto atravessa o obstáculo que a reserva pagou
+    this.root.visible = !(this.invuln > 0 && Math.floor(this.invuln * 12) % 2);
     // inclina e olha para o lado da troca de faixa
     t.quaternion.copy(qy(this.yaw - clamp(dx * 0.12, -0.35, 0.35)).multiply(qz(clamp(dx * 0.15, -0.3, 0.3))));
     // squash & stretch: estica subindo/caindo rápido, achata ao tocar o chão e volta com mola

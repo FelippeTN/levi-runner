@@ -1,7 +1,9 @@
-"""Serve o dist/ e a API de login (contas locais) + ranking.
+"""Serve o dist/ e a API de login (contas locais), ranking e Banco do Levi (conta, cofrinho, investimentos, loja).
 
 Primeiro acesso com um usuário novo cria a conta; depois, a mesma senha é exigida.
-Uso: python3 server.py [porta]   (padrão 8042; só biblioteca padrão)
+O dinheiro mora aqui: o jogo só mostra. Regras e preços vêm de src/edu/catalog.json (o mesmo que o jogo lê).
+Valores em centavos inteiros. Cada corrida de pelo menos `metrosParaMes` conta como um mês de rendimento.
+Uso: python3 server.py [porta]   (padrão 8042; só biblioteca padrão; LEVI_DB troca o arquivo do banco)
 """
 
 import hashlib
@@ -17,14 +19,33 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
-db = sqlite3.connect(os.path.join(ROOT, "ranking.db"), check_same_thread=False, isolation_level=None)
+# no repositório fica em src/edu; no dist/ o build.sh deixa uma cópia
+CATALOG_PATH = next(p for p in (os.path.join(ROOT, "src", "edu", "catalog.json"), os.path.join(ROOT, "dist", "catalog.json"))
+                    if os.path.isfile(p))
+with open(CATALOG_PATH, encoding="utf-8") as f:
+    CATALOG = json.load(f)
+BANCO = CATALOG["banco"]
+SKINS = {s["id"]: s for s in CATALOG["skins"]}
+
+db = sqlite3.connect(os.environ.get("LEVI_DB", os.path.join(ROOT, "ranking.db")), check_same_thread=False, isolation_level=None)
 db.executescript("""
     create table if not exists players (login text primary key, name text not null, best integer not null default 0);
     create table if not exists sessions (token text primary key, login text not null);
+    create table if not exists contas (
+        login text primary key,
+        conta integer not null default 0,
+        cofrinho integer not null default 0,
+        aplicacoes text not null default '[]',
+        mes integer not null default 0,
+        skins text not null default '["classico"]',
+        pintura text not null default 'classico',
+        acessorio text
+    );
 """)
 if "pw" not in [c[1] for c in db.execute("pragma table_info(players)")]:
     db.execute("alter table players add column pw text")  # bancos da versão com LDAP
-db_lock = threading.Lock()
+# reentrante: uma operação no dinheiro segura a trava do ler-mudar-gravar inteiro, e sql() pega de novo
+db_lock = threading.RLock()
 
 
 def sql(query, *args):
@@ -46,6 +67,104 @@ def check_or_create(login, password):
         return True
     stored = rows[0][0]
     return secrets.compare_digest(stored, hash_pw(password, stored.split("$")[0]))
+
+
+# ---------- Banco do Levi: regras puras sobre um dict (testadas em tests/test_server.py) ----------
+
+class Recusado(Exception):
+    """Operação que o banco não aceita; a mensagem vai para o jogador."""
+
+
+def render(valor, taxa):
+    return int(valor * taxa + 0.5)
+
+
+def fim_de_corrida(acc, distancia, patrimonio):
+    """Deposita o que a corrida juntou e, se a corrida valeu um mês, aplica o rendimento. Devolve o resumo."""
+    distancia = max(0, min(int(distancia), 1_000_000))
+    # ponytail: o patrimônio vem do cliente; o teto pela distância só limita o estrago de quem forjar
+    deposito = max(0, min(int(patrimonio), distancia * BANCO["tetoPorMetro"]))
+    acc["conta"] += deposito
+    resumo = {"deposito": deposito, "mes": False, "cofrinho": 0, "investimento": 0, "liberado": 0}
+    if distancia < BANCO["metrosParaMes"]:
+        return resumo
+    acc["mes"] += 1
+    resumo["mes"] = True
+    resumo["cofrinho"] = render(acc["cofrinho"], BANCO["cofrinho"])
+    acc["cofrinho"] += resumo["cofrinho"]
+    ativas = []
+    for ap in acc["aplicacoes"]:
+        r = render(ap["valor"], BANCO["investimento"])
+        ap["valor"] += r
+        resumo["investimento"] += r
+        if acc["mes"] >= ap["libera_em"]:
+            acc["conta"] += ap["valor"]
+            resumo["liberado"] += ap["valor"]
+        else:
+            ativas.append(ap)
+    acc["aplicacoes"] = ativas
+    return resumo
+
+
+def movimentar(acc, acao, valor):
+    """guardar (conta → cofrinho), sacar (cofrinho → conta) ou investir (conta → aplicação travada)."""
+    try:
+        valor = int(valor)
+    except (TypeError, ValueError):
+        raise Recusado("Valor inválido")
+    if valor <= 0:
+        raise Recusado("Valor inválido")
+    origem = "cofrinho" if acao == "sacar" else "conta"
+    if acao not in ("guardar", "sacar", "investir"):
+        raise Recusado("Operação desconhecida")
+    if acc[origem] < valor:
+        raise Recusado("Saldo insuficiente")
+    acc[origem] -= valor
+    if acao == "guardar":
+        acc["cofrinho"] += valor
+    elif acao == "sacar":
+        acc["conta"] += valor
+    else:
+        acc["aplicacoes"].append({"valor": valor, "libera_em": acc["mes"] + BANCO["carencia"]})
+
+
+def comprar(acc, skin_id):
+    skin = SKINS.get(skin_id)
+    if not skin:
+        raise Recusado("Skin desconhecida")
+    if skin_id in acc["skins"]:
+        raise Recusado("Você já tem essa skin")
+    if acc["conta"] < skin["preco"]:
+        raise Recusado("Saldo na conta insuficiente")
+    acc["conta"] -= skin["preco"]
+    acc["skins"].append(skin_id)
+    vestir(acc, skin_id)
+
+
+def vestir(acc, skin_id):
+    """Veste uma skin comprada; acessório `None` tira o acessório."""
+    if skin_id is None:
+        acc["acessorio"] = None
+        return
+    if skin_id not in acc["skins"] or skin_id not in SKINS:
+        raise Recusado("Skin não comprada")
+    acc["pintura" if SKINS[skin_id]["tipo"] == "pintura" else "acessorio"] = skin_id
+
+
+COLS = ("conta", "cofrinho", "aplicacoes", "mes", "skins", "pintura", "acessorio")
+
+
+def carregar(login):
+    sql("insert or ignore into contas (login) values (?)", login)
+    row = sql(f"select {', '.join(COLS)} from contas where login = ?", login)[0]
+    acc = dict(zip(COLS, row))
+    acc["aplicacoes"], acc["skins"] = json.loads(acc["aplicacoes"]), json.loads(acc["skins"])
+    return acc
+
+
+def salvar(login, acc):
+    vals = [json.dumps(acc[c]) if c in ("aplicacoes", "skins") else acc[c] for c in COLS]
+    sql(f"update contas set {', '.join(c + ' = ?' for c in COLS)} where login = ?", *vals, login)
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -80,6 +199,12 @@ class Handler(SimpleHTTPRequestHandler):
         return rows[0][0] if rows else None
 
     def do_GET(self):
+        if self.path == "/api/conta":
+            login = self.login_from_token()
+            if not login:
+                return self.send_json({"erro": "Faça login"}, 401)
+            with db_lock:
+                return self.send_json(carregar(login))
         if self.path != "/api/ranking":
             return super().do_GET()
         top = sql("select name, best, login from players where best > 0 order by best desc limit 10")
@@ -92,6 +217,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+            if not isinstance(body, dict):
+                raise ValueError
         except ValueError:
             return self.send_json({"erro": "JSON inválido"}, 400)
 
@@ -108,16 +235,32 @@ class Handler(SimpleHTTPRequestHandler):
             sql("insert into sessions values (?, ?)", token, login)
             return self.send_json({"token": token})
 
-        if self.path == "/api/score":
-            login = self.login_from_token()
-            if not login:
-                return self.send_json({"erro": "Faça login"}, 401)
-            # ponytail: a pontuação vem do cliente e dá para forjar; validar no servidor se virar competição séria
-            score = max(0, min(int(body.get("pontos", 0)), 10_000_000))
-            sql("update players set best = max(best, ?) where login = ?", score, login)
-            return self.send_json({"ok": True})
-
-        self.send_json({"erro": "Não encontrado"}, 404)
+        login = self.login_from_token()
+        if not login:
+            return self.send_json({"erro": "Faça login"}, 401)
+        try:
+            with db_lock:
+                acc = carregar(login)
+                resumo = None
+                if self.path == "/api/corrida":
+                    # ponytail: a pontuação vem do cliente e dá para forjar; validar no servidor se virar competição séria
+                    score = max(0, min(int(body.get("pontos", 0)), 10_000_000))
+                    sql("update players set best = max(best, ?) where login = ?", score, login)
+                    resumo = fim_de_corrida(acc, body.get("distancia", 0), body.get("patrimonio", 0))
+                elif self.path == "/api/banco":
+                    movimentar(acc, body.get("acao"), body.get("valor"))
+                elif self.path == "/api/loja":
+                    comprar(acc, body.get("skin"))
+                elif self.path == "/api/vestir":
+                    vestir(acc, body.get("skin"))
+                else:
+                    return self.send_json({"erro": "Não encontrado"}, 404)
+                salvar(login, acc)
+        except (TypeError, ValueError):
+            return self.send_json({"erro": "Dados inválidos"}, 400)
+        except Recusado as e:
+            return self.send_json({"erro": str(e)}, 400)
+        self.send_json({**acc, "resumo": resumo})
 
 
 if __name__ == "__main__":

@@ -5,5 +5,5 @@ export default defineConfig({
   publicDir: "assets",
   build: { assetsDir: "js", chunkSizeWarningLimit: 1200 },
   // API de login/ranking do server.py durante o `pnpm dev`
-  server: { proxy: { "/api": "http://localhost:8042" } },
+  server: { proxy: { "/api": process.env.LEVI_API ?? "http://localhost:8042" } },
 });

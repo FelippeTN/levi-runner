@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Object3D, Vector2, Vector3 } from "three";
 import { CAR_GAP, CAR_LEN, CAR_TOP, LANES, MAX_DT, RAMP_LEN } from "../src/config.js";
+import { COIN, SHOCK } from "../src/edu/economy.js";
 import { Events, Game, Phase } from "../src/game.js";
 import { JUMP_V, Player } from "../src/player.js";
 import { groundAt, heightAt, hit } from "../src/world/collision.js";
@@ -131,3 +132,70 @@ test("batida de lado tropeça e volta de faixa; de frente derruba", () => {
   assert.equal(game.phase, Phase.Dying);
 });
 
+
+test("reserva paga a batida e o Levi atravessa; sem reserva, cai", () => {
+  const crash = (reserve) => {
+    const game = new Game(1);
+    game.phase = Phase.Playing;
+    game.wallet.reserve = reserve;
+    const world = new World(new Object3D(), game);
+    // trem de 3 carros parado de frente na faixa do meio: leva mais que a invulnerabilidade para atravessar
+    for (let k = 0; k < 3; k++) {
+      world.add({ obj: at(0, CAR_TOP / 2, -CAR_LEN / 2 - 0.1 - k * (CAR_LEN + CAR_GAP)), obstacle: new Vector3(1.1, CAR_TOP / 2, CAR_LEN / 2) });
+    }
+    const p = new Player();
+    for (let i = 0; i < 300; i++) {
+      step(game, world, p, 1 / 60);
+      if (game.phase !== Phase.Playing) break;
+    }
+    return { game, p };
+  };
+  const saved = crash(SHOCK);
+  assert.equal(saved.game.phase, Phase.Playing, "a reserva devia ter pago o imprevisto");
+  assert.equal(saved.game.wallet.reserve, 0);
+  assert.equal(saved.game.wallet.ledger.reservaUsada, 1, "atravessar o trem inteiro custa um imprevisto só");
+  assert.equal(crash(SHOCK - 1).game.phase, Phase.Dying);
+});
+
+test("fileira de portal ocupa as 3 faixas, longe de obstáculos e trens", () => {
+  const game = new Game(5);
+  game.phase = Phase.Playing;
+  const world = new World(new Object3D(), game);
+  const stub = () => new Object3D();
+  world.props = { portal: stub, coin: stub, barrier: stub, sign: stub, ramp: stub, vehicle: stub };
+  const rows = new Set();
+  for (let i = 0; i < 60 * 300; i++) {
+    world.scroll(1 / 60);
+    game.distance += game.speed / 60;
+    world.spawnRows();
+    for (const it of world.items) {
+      if (!it.portal || rows.has(it.row)) continue;
+      rows.add(it.row);
+      const row = world.items.filter((o) => o.row === it.row);
+      assert.deepEqual(row.map((o) => o.obj.position.x).sort(), [...LANES].sort());
+      assert.equal(new Set(row.map((o) => o.portal)).size, 3);
+      for (const o of world.items) {
+        if (o.obstacle) assert.ok(Math.abs(o.obj.position.z - it.obj.position.z) > o.obstacle.z + 1, "obstáculo colado no portal");
+      }
+    }
+  }
+  assert.ok(rows.size >= 10, `só ${rows.size} portais em 5 min`);
+});
+
+test("portal vale uma escolha por fileira", () => {
+  const game = new Game(1);
+  game.phase = Phase.Playing;
+  for (let i = 0; i < 40; i++) game.wallet.collect();
+  const world = new World(new Object3D(), game);
+  const row = { used: false };
+  // meio da troca de faixa: encosta em dois portais ao mesmo tempo
+  world.add({ obj: at(0, 0, 0), portal: "poupar", row });
+  world.add({ obj: at(2.5, 0, 0), portal: "investir", row });
+  const p = new Player();
+  p.root.position.x = 1.25;
+  const events = new Events();
+  world.collide(p, events);
+  world.collide(p, events);
+  assert.equal(events.money.length, 1);
+  assert.equal(game.wallet.total, 40 * COIN);
+});

@@ -15,6 +15,8 @@ import {
   ZONES,
   zoneAt,
 } from "../config.js";
+import catalog from "../edu/catalog.json" with { type: "json" };
+import { portalKinds } from "../edu/economy.js";
 import { Phase } from "../game.js";
 import { Batch, clearBatched } from "./batch.js";
 import { groundAt, hit } from "./collision.js";
@@ -23,6 +25,11 @@ import { buildTile } from "./zones.js";
 
 const UP = new Vector3(0, 1, 0);
 const COIN_HALF = new Vector3(0.45, 0.45, 0.45);
+/** com o ímã, alcança as faixas vizinhas e as moedas no alto */
+const MAGNET_HALF = new Vector3(2.9, 2.2, 1.2);
+/** atravessar o arco do portal: faixa inteira, qualquer altura de pulo */
+const PORTAL_HALF = new Vector3(1.1, 3, 0.4);
+const PORTAL_EVERY = catalog.corrida.portalACada;
 
 /**
  * Algo que anda junto com o mundo.
@@ -32,6 +39,8 @@ const COIN_HALF = new Vector3(0.45, 0.45, 0.45);
  * @property {{half: Vector2, top: number, ramp: boolean}} [platform] superfície onde dá para pisar
  * @property {number} [mover] veículo na contramão: velocidade extra
  * @property {boolean} [coin]
+ * @property {string} [portal] poupar | investir | comprar | apostar
+ * @property {{used: boolean}} [row] os três portais de uma fileira valem uma escolha só
  */
 
 export class World {
@@ -174,6 +183,17 @@ export class World {
     // faixas ainda ocupadas por um trem comprido ficam de fora; uma das livres é sempre segura
     const free = [0, 1, 2].filter((l) => this.busy[l] < d);
     if (!free.length) return;
+    // portal de decisão: as três faixas viram escolhas (só com a pista toda livre, nada bloqueia)
+    if (free.length === 3 && d - SPAWN_Z >= g.nextPortal) {
+      g.nextPortal = d - SPAWN_Z + PORTAL_EVERY;
+      const row = { used: false };
+      portalKinds(zoneAt(d - SPAWN_Z), () => g.rand()).forEach((kind, lane) => {
+        const obj = this.props.portal(kind);
+        obj.position.set(LANES[lane], 0, spawnZ);
+        this.add({ obj, portal: kind, row });
+      });
+      return;
+    }
     const safe = free[g.pick(free.length)];
     for (const lane of free) {
       const x = LANES[lane];
@@ -239,7 +259,10 @@ export class World {
     const blocking = this.items.find(
       (it) => it.obstacle && (!it.platform || p.y < it.platform.top - 0.5) && hit(center, half, it.obj.position, it.obstacle),
     );
-    if (blocking) {
+    if (blocking && p.invuln > 0) {
+      // atravessando o que bateu depois que a reserva pagou: só volta a valer quando sair de dentro
+      p.invuln = Math.max(p.invuln, 0.3);
+    } else if (blocking) {
       const side = Math.abs(p.x - LANES[p.lane]) > 0.25;
       if (side && g.sinceStumble < 0.4) {
         // ainda saindo do tropeço anterior
@@ -252,6 +275,14 @@ export class World {
         events.sfx.push("stumble");
         events.shake.push(0.5);
         events.burst.push({ pos: center.clone(), kind: "dust" });
+      } else if (g.wallet.absorbCrash()) {
+        // a reserva de emergência paga o imprevisto: o Levi segue piscando
+        p.invuln = 1.2;
+        g.speed *= 0.85;
+        events.sfx.push("powerup");
+        events.shake.push(0.6);
+        events.burst.push({ pos: center.clone(), kind: "sparkle" });
+        events.money.push({ text: "A RESERVA TE SALVOU!", good: true, big: true });
       } else {
         g.phase = Phase.Dying;
         g.dying = 0;
@@ -260,10 +291,21 @@ export class World {
         events.burst.push({ pos: center.clone().setZ(-0.4), kind: "debris" });
       }
     }
+    for (const it of this.items) {
+      if (it.portal && !it.row.used && hit(center, half, it.obj.position.clone().setY(PORTAL_HALF.y), PORTAL_HALF)) {
+        it.row.used = true;
+        const r = g.wallet.choose(it.portal, () => g.rand());
+        if (r.magnet) p.magnet = catalog.corrida.imaSegundos;
+        events.sfx.push(r.good ? "powerup" : "stumble");
+        events.money.push({ text: r.text, good: r.good, big: true });
+      }
+    }
+    const reach = p.magnet > 0 ? MAGNET_HALF : COIN_HALF;
     let taken = false;
     for (const it of this.items) {
-      if (it.coin && hit(center, half, it.obj.position, COIN_HALF)) {
+      if (it.coin && hit(center, half, it.obj.position, reach)) {
         g.coins++;
+        g.wallet.collect();
         events.sfx.push("coin");
         events.burst.push({ pos: it.obj.position.clone(), kind: "sparkle" });
         it.obj.removeFromParent();

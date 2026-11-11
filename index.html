@@ -13,28 +13,51 @@
   <!-- pausa (canto superior esquerdo) -->
   <button id="pause" class="blue-button" data-show="playing paused" aria-label="Pausar"><i></i><i></i></button>
 
-  <!-- pontos e moedas empilhados no canto superior direito -->
-  <div class="stats">
-    <div class="plate" data-show="playing paused"><span id="score" class="score"></span></div>
-    <div class="plate"><span id="coins" class="coins">0</span><span class="coin-icon"></span></div>
+  <!-- pontos e carteira empilhados no canto superior direito -->
+  <div class="stats" data-show="playing paused">
+    <div class="plate"><span id="score" class="score"></span></div>
+    <div class="plate"><span id="cash" class="coins">R$ 0</span><span class="coin-icon"></span></div>
+    <div class="pots">
+      <span id="reserve" class="pot pot-reserve" hidden></span>
+      <span id="invested" class="pot pot-invest" hidden></span>
+    </div>
   </div>
 
-  <!-- início / fim de jogo: selo do título no alto, "toque para jogar" embaixo (o Levi fica no meio) -->
+  <!-- dinheiro entrando e saindo -->
+  <div id="floaters" aria-live="polite"></div>
+
+  <!-- início / fim de jogo: selo do título no alto, extrato e navegação embaixo (o Levi fica no meio) -->
   <div class="menu" data-show="menu">
-    <div class="badge">
-      <div class="bubbles">
-        <b style="width:30%;left:6%;top:26%"></b>
-        <b style="width:28%;left:64%;top:18%"></b>
-        <b style="width:18%;left:0;top:8%"></b>
-        <b style="width:16%;left:82%;top:4%"></b>
-        <b style="width:20%;left:20%;top:58%"></b>
-        <b style="width:16%;left:66%;top:66%"></b>
-        <b style="width:46%;left:27%;top:0"></b>
-        <h1 id="title"></h1>
+    <div class="top">
+      <div class="badge">
+        <div class="bubbles">
+          <b style="width:30%;left:6%;top:26%"></b>
+          <b style="width:28%;left:64%;top:18%"></b>
+          <b style="width:18%;left:0;top:8%"></b>
+          <b style="width:16%;left:82%;top:4%"></b>
+          <b style="width:20%;left:20%;top:58%"></b>
+          <b style="width:16%;left:66%;top:66%"></b>
+          <b style="width:46%;left:27%;top:0"></b>
+          <h1 id="title">LEVI
+RUNNER</h1>
+        </div>
+        <p id="banner" class="banner">Rio de Janeiro</p>
       </div>
-      <p id="banner" class="banner"></p>
+      <button id="goal" class="goal" hidden></button>
     </div>
-    <p id="cta" class="cta"></p>
+
+    <section id="statement" class="statement" hidden>
+      <h2>EXTRATO DA CORRIDA</h2>
+      <dl id="statement-rows"></dl>
+      <p id="statement-deposit" class="deposit"></p>
+      <p id="tip" class="tip"></p>
+    </section>
+
+    <nav class="menu-nav">
+      <button id="open-bank" class="blue-button nav-button">BANCO</button>
+      <button id="play" class="play-button">JOGAR</button>
+      <button id="open-shop" class="blue-button nav-button">LOJA</button>
+    </nav>
   </div>
 
   <div class="paused" data-show="paused">
@@ -50,6 +73,19 @@ Esc pausa   M som</p>
 
   <p id="zone" class="zone"></p>
 </div>
+
+<!-- painéis do menu: Banco e Loja -->
+<div id="backdrop" class="backdrop" hidden></div>
+
+<section id="bank" class="sheet" hidden aria-labelledby="bank-title">
+  <header><h2 id="bank-title">BANCO DO LEVI</h2><span id="bank-month" class="month"></span><button class="close" data-close aria-label="Fechar">✕</button></header>
+  <div class="sheet-body" id="bank-body"></div>
+</section>
+
+<section id="shop" class="sheet" hidden aria-labelledby="shop-title">
+  <header><h2 id="shop-title">LOJA DO LEVI</h2><span id="shop-balance" class="month"></span><button class="close" data-close aria-label="Fechar">✕</button></header>
+  <div class="sheet-body" id="shop-body"></div>
+</section>
 
 <div id="loading">Carregando o Levi…</div>
 

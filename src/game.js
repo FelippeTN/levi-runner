@@ -1,4 +1,8 @@
 import { FIRST_ROW, START_SPEED } from "./config.js";
+import { Wallet } from "./edu/economy.js";
+
+/** Distância do primeiro portal de decisão (dá tempo de juntar algumas moedas antes). */
+const FIRST_PORTAL = 150;
 
 export const Phase = Object.freeze({
   Ready: "ready",
@@ -21,14 +25,19 @@ export class Game {
     this.speed = START_SPEED;
     this.distance = 0;
     this.coins = 0;
+    /** dinheiro da corrida: carteira, reserva e investimento */
+    this.wallet = new Wallet();
     this.nextSpawn = FIRST_ROW;
+    /** distância em que a próxima fileira vira portal de decisão */
+    this.nextPortal = FIRST_PORTAL;
     /** segundos desde o último tropeço (dois em 3 s = fim) */
     this.sinceStumble = 99;
     this.dying = 0;
   }
 
+  /** Distância + patrimônio em reais: o ranking premia quem guarda e investe, não só quem corre. */
   get score() {
-    return Math.floor(this.distance) + this.coins * 10;
+    return Math.floor(this.distance) + Math.floor(this.wallet.total / 100);
   }
 
   /** xorshift32: determinístico, a mesma semente monta o mesmo Rio. */
@@ -48,14 +57,16 @@ export class Game {
 
 /** Mensagens do quadro (som, tremida, partículas); quem consome lê, o laço principal limpa. */
 export class Events {
-  /** @type {string[]} jump | land | roll | swipe | coin | stumble | crash */
+  /** @type {string[]} jump | land | roll | swipe | coin | stumble | crash | powerup */
   sfx = [];
   /** @type {number[]} trauma da câmera (0..1) */
   shake = [];
   /** @type {{pos: import("three").Vector3, kind: "dust" | "sparkle" | "debris"}[]} */
   burst = [];
+  /** @type {{text: string, good: boolean, big?: boolean}[]} dinheiro entrando ou saindo, mostrado na tela */
+  money = [];
 
   clear() {
-    this.sfx.length = this.shake.length = this.burst.length = 0;
+    this.sfx.length = this.shake.length = this.burst.length = this.money.length = 0;
   }
 }

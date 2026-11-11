@@ -57,9 +57,10 @@ html, body { margin: 0; height: 100%; background: #87c7f2; overflow: hidden; tou
 }
 
 .menu {
-  position: absolute; inset: 0; box-sizing: border-box; padding: max(5vh, 76px) 0 16vh;
-  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  position: absolute; inset: 0; box-sizing: border-box; padding: max(4vh, 76px) 16px 14vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 12px;
 }
+.top { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; }
 .badge { display: flex; flex-direction: column; align-items: center; width: 460px; max-width: 94%; transform: rotate(-4deg); }
 .bubbles { position: relative; width: 100%; aspect-ratio: 2.1; display: grid; place-items: center; }
 .bubbles b {
@@ -75,7 +76,146 @@ html, body { margin: 0; height: 100%; background: #87c7f2; overflow: hidden; tou
   position: relative; margin-top: -6px !important; padding: 4px 18px; border-radius: 20px;
   background: var(--coral); box-shadow: 0 4px 0 var(--navy); font-size: 20px; text-align: center;
 }
-.cta { font-size: clamp(22px, 7vw, 34px); text-shadow: 0 4px 0 var(--navy); text-align: center; }
+
+/* ---------- carteira e dinheiro voando ---------- */
+
+.pots { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.pot { padding: 3px 10px; border-radius: 10px; font-size: 15px; text-shadow: 0 2px 0 var(--navy); border: 2px solid #fff; }
+.pot-reserve { background: linear-gradient(#34d399, #059669); }
+.pot-invest { background: linear-gradient(#60a5fa, #2563eb); }
+
+#floaters { position: absolute; left: 0; right: 0; top: 30%; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.floater { font-size: 24px; text-shadow: 0 3px 0 var(--navy); white-space: nowrap; animation: float-up 1.7s ease-out forwards; }
+.floater.big { font-size: clamp(26px, 6vw, 40px); }
+.floater.good { color: var(--title); }
+.floater.bad { color: #ff9a8a; }
+@keyframes float-up {
+  0% { opacity: 0; transform: translateY(24px) scale(.8); }
+  15% { opacity: 1; transform: translateY(0) scale(1.08); }
+  70% { opacity: 1; transform: translateY(-28px) scale(1); }
+  100% { opacity: 0; transform: translateY(-60px); }
+}
+
+/* ---------- menu: meta, extrato e navegação ---------- */
+
+#hud .goal {
+  position: absolute; top: 14px; right: 14px; max-width: min(340px, calc(100% - 28px)); box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+  padding: 6px 16px; border-radius: 14px; border: 2px solid rgb(255 255 255 / .5); font-size: 15px;
+  background: linear-gradient(90deg, rgb(34 197 94 / .7) var(--p, 0%), rgb(5 15 36 / .78) var(--p, 0%));
+}
+.goal small { font-size: 12px; opacity: .9; }
+
+.statement {
+  width: min(420px, 100%); box-sizing: border-box; padding: 12px 18px; border-radius: 18px;
+  background: rgb(5 15 36 / .84); border-top: 2px solid rgb(255 255 255 / .25);
+}
+.statement h2 { font-size: 15px; letter-spacing: .08em; color: var(--title); margin-bottom: 6px !important; }
+.statement dl { margin: 0; display: grid; gap: 2px; }
+.statement dl div { display: flex; justify-content: space-between; gap: 12px; font-size: 16px; }
+.statement dd { margin: 0; }
+.statement .good dd { color: #86efac; }
+.statement .bad dd { color: #fca5a5; }
+.statement .total { border-top: 1px solid rgb(255 255 255 / .25); margin-top: 4px; padding-top: 4px; font-size: 20px; color: var(--gold); }
+.deposit { font-size: 13px; color: #bfe3ff; margin-top: 6px !important; }
+.tip { font-size: 14px; line-height: 1.3; margin-top: 8px !important; }
+.tip::before { content: "DICA DO LEVI · "; color: var(--title); }
+
+.menu-nav { display: flex; align-items: center; gap: 12px; }
+.nav-button { min-height: 48px; padding: 8px 18px; border-radius: 16px; font-size: 20px; text-shadow: 0 2px 0 var(--navy); }
+.play-button {
+  pointer-events: auto; cursor: pointer; font-family: inherit; font-weight: 700; font-size: clamp(26px, 7vw, 34px);
+  padding: 8px 34px; border-radius: 20px; border: 4px solid #fff; background: linear-gradient(#ffe066, #ffab0a);
+  box-shadow: 0 6px 0 #a35f00; animation: pulse 1.25s ease-in-out infinite;
+}
+#hud .play-button, .sheet .play-button { color: var(--navy); }
+.sheet .play-button { font-size: 22px; padding: 10px 16px; animation: none; }
+/* painel aberto: o menu sai da frente do Levi (o provador precisa dele à vista) */
+body.panel-open .menu { visibility: hidden; }
+.play-button:active { transform: translateY(4px); box-shadow: 0 2px 0 #a35f00; animation: none; }
+.play-button:disabled { filter: grayscale(.7); opacity: .7; cursor: not-allowed; animation: none; }
+@keyframes pulse { 50% { transform: scale(1.06); } }
+@media (max-width: 600px) {
+  .menu { padding-bottom: 12vh; }
+  .nav-button { font-size: 16px; padding: 8px 12px; }
+  .play-button { padding: 8px 22px; }
+}
+
+/* ---------- painéis (Banco e Loja) ---------- */
+
+.backdrop { position: fixed; inset: 0; z-index: 1; background: rgb(0 8 26 / .35); }
+.sheet {
+  position: fixed; z-index: 1; top: 12px; right: 12px; bottom: 12px; width: min(440px, calc(100vw - 24px));
+  display: flex; flex-direction: column; overflow: hidden; color: #fff; font: 700 16px var(--font);
+  background: linear-gradient(#4da8ff, #0f58d8); border: 4px solid #fff; border-radius: 24px;
+  box-shadow: 0 8px 0 #06266b, 0 20px 40px #0007; animation: slide-in .22s ease-out;
+}
+.sheet button { font-family: inherit; font-weight: 700; cursor: pointer; }
+.sheet header { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
+.sheet h2 { flex: 1; margin: 0; font-size: 26px; color: var(--title); text-shadow: 0 3px 0 var(--navy); }
+.month { font-size: 13px; padding: 4px 10px; border-radius: 10px; background: rgb(5 15 36 / .5); white-space: nowrap; }
+.month:empty { display: none; }
+.close { width: 44px; height: 44px; border-radius: 12px; border: 3px solid #fff; background: rgb(5 15 36 / .35); color: #fff; font-size: 20px; }
+.sheet-body { overflow-y: auto; padding: 0 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.sheet-body > * { min-width: 0; }
+.lead { margin: 0; font-size: 15px; line-height: 1.35; }
+.wide { width: 100%; }
+@keyframes slide-in { from { transform: translateX(40px); opacity: 0; } }
+@keyframes slide-up { from { transform: translateY(60px); opacity: 0; } }
+@media (max-width: 600px) {
+  .sheet { top: auto; left: 0; right: 0; bottom: 0; width: auto; height: 86vh; border-radius: 24px 24px 0 0; border-bottom: 0; animation-name: slide-up; }
+  /* loja mais baixa: o Levi do provador aparece em cima */
+  #shop { height: 44vh; }
+  /* no celular o ranking cobriria o título do menu; ele aparece durante a corrida */
+  body[data-screen="menu"] #ranking { display: none; }
+}
+
+.yield { margin: 0; padding: 10px 12px; border-radius: 14px; text-align: center; background: linear-gradient(#34d399, #059669); border: 2px solid #fff; }
+.yield b { font-size: 22px; color: #fff59d; }
+.accounts { display: grid; gap: 8px; }
+.acc { padding: 8px 12px; border-radius: 14px; background: rgb(5 15 36 / .45); border-left: 6px solid var(--k); }
+.acc h3 { margin: 0; font-size: 13px; letter-spacing: .08em; opacity: .85; }
+.acc b { font-size: 24px; }
+.acc p { margin: 0; font-size: 12px; font-weight: 600; opacity: .9; }
+.acc ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; }
+.acc li span { font-weight: 600; opacity: .8; }
+.acc-conta { --k: #cbd5e1; }
+.acc-save { --k: #22c55e; }
+.acc-invest { --k: #60a5fa; }
+.move { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px; border-radius: 14px; background: rgb(5 15 36 / .3); }
+.move label { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.move input { flex: 1; min-width: 0; font: inherit; font-size: 20px; padding: 8px 12px; border-radius: 12px; border: 3px solid #0b3c99; color: var(--navy); }
+.chips { display: flex; gap: 8px; }
+.chips button { flex: 1; min-height: 40px; border-radius: 12px; border: 2px solid #fff; background: rgb(255 255 255 / .15); color: #fff; }
+.actions { display: grid; gap: 8px; }
+.act { min-height: 46px; border-radius: 14px; border: 3px solid #fff; color: #fff; font-size: 16px; box-shadow: 0 4px 0 rgb(0 0 0 / .3); }
+.act:disabled { opacity: .6; }
+.act-save { background: linear-gradient(#34d399, #059669); }
+.act-invest { background: linear-gradient(#60a5fa, #1d4ed8); }
+.act-out { background: linear-gradient(#94a3b8, #475569); }
+.act-goal { background: linear-gradient(#f472b6, #be185d); }
+.msg { margin: 0; min-height: 1.2em; font-size: 14px; color: #fff59d; }
+.projection { padding: 10px 12px; border-radius: 14px; background: rgb(5 15 36 / .45); --still: #cbd5e1; --save: #4ade80; --invest: #93c5fd; }
+.projection h3 { margin: 0 0 6px; font-size: 15px; }
+.projection svg { display: block; width: 100%; height: auto; }
+.projection polyline { fill: none; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.legend { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 12px; }
+.legend li { display: grid; padding-top: 4px; border-top: 4px solid var(--c); }
+.legend b { font-size: 15px; }
+.note { margin: 6px 0 0; font-size: 11px; font-weight: 600; opacity: .8; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.card { display: grid; justify-items: center; gap: 4px; padding: 10px 6px; border-radius: 14px; border: 3px solid transparent; background: rgb(5 15 36 / .45); color: #fff; }
+.card.on { border-color: var(--title); background: rgb(5 15 36 / .7); }
+.card span { font-size: 13px; line-height: 1.15; text-align: center; }
+.card em { font-style: normal; font-size: 13px; color: var(--gold); }
+.card.owned em { color: #86efac; }
+.swatch { width: 40px; height: 40px; box-sizing: border-box; border-radius: 50%; border: 3px solid #fff; background: conic-gradient(var(--a) 0 50%, var(--b) 0 75%, var(--c) 0); }
+.icon { font-style: normal; font-size: 30px; line-height: 40px; }
+.detail { display: grid; gap: 8px; padding: 10px 12px; border-radius: 14px; background: rgb(5 15 36 / .3); }
+.detail h3 { margin: 0; font-size: 20px; }
+.detail p { margin: 0; font-size: 14px; font-weight: 600; }
+.detail .hint-line { color: #fde68a; }
 
 .paused {
   position: absolute; inset: 0; background: rgb(0 8 26 / .4);

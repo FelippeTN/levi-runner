@@ -1,0 +1,33 @@
+{
+  "_leia": "Regras e preços do dinheiro do jogo, lidos pelo jogo e pelo server.py. Valores em centavos. Taxas são de jogo, não do mundo real.",
+  "moeda": 1000,
+  "imprevisto": 5000,
+  "corrida": {
+    "jurosPor100m": 0.02,
+    "parteDoPortal": 0.5,
+    "apostaUmEm": 6,
+    "imaSegundos": 8,
+    "portalACada": 250
+  },
+  "banco": {
+    "metrosParaMes": 200,
+    "tetoPorMetro": 2000,
+    "cofrinho": 0.01,
+    "investimento": 0.03,
+    "carencia": 6
+  },
+  "skins": [
+    { "id": "classico", "nome": "Levi Clássico", "tipo": "pintura", "preco": 0 },
+    { "id": "verde_amarelo", "nome": "Verde-Amarelo", "tipo": "pintura", "preco": 80000,
+      "cores": { "corpo": "#fff3a6", "branco": "#ffe14a", "azul": "#16a34a", "preto": "#0b3d91" } },
+    { "id": "oculos", "nome": "Óculos Escuros", "tipo": "acessorio", "preco": 120000, "modelo": "oculos" },
+    { "id": "por_do_sol", "nome": "Pôr do Sol de Ipanema", "tipo": "pintura", "preco": 150000,
+      "cores": { "corpo": "#ffe0d0", "branco": "#ffc6d9", "azul": "#ff6a2b", "preto": "#7a1f5c" } },
+    { "id": "panama", "nome": "Chapéu-Panamá da Lapa", "tipo": "acessorio", "preco": 250000, "modelo": "panama" },
+    { "id": "prancha", "nome": "Prancha nas Costas", "tipo": "acessorio", "preco": 400000, "modelo": "prancha", "costas": true },
+    { "id": "noite_lapa", "nome": "Noite na Lapa", "tipo": "pintura", "preco": 600000,
+      "cores": { "corpo": "#6b6488", "branco": "#2a2440", "azul": "#c04dff", "preto": "#ff3fa4" }, "brilho": "azul" },
+    { "id": "ouro", "nome": "Levi de Ouro", "tipo": "pintura", "preco": 1500000,
+      "cores": { "corpo": "#ffd75e", "branco": "#f2c230", "azul": "#fff1a8", "preto": "#8a5a00" }, "metal": true }
+  ]
+}

@@ -1,23 +1,19 @@
 // Login com conta local (via server.py; o 1º acesso cria a conta) e ranking no canto da tela.
 
-const TOKEN = "levi-token";
-
-const api = (path, body) =>
-  fetch(path, {
-    method: body ? "POST" : "GET",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + (localStorage.getItem(TOKEN) || "") },
-    body: body && JSON.stringify(body),
-  });
+import { api, setToken } from "./api.js";
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 const loginBox = document.getElementById("login");
 const rankBox = document.getElementById("ranking");
 
-async function refresh() {
-  const res = await api("/api/ranking");
-  if (!res.ok) return; // sem server.py (ex.: só o front no ar): joga sem ranking
-  const r = await res.json();
+export async function refreshRanking() {
+  let r;
+  try {
+    r = await api("/api/ranking");
+  } catch {
+    return; // sem server.py (ex.: só o front no ar): joga sem ranking
+  }
   if (!r.eu) {
     loginBox.hidden = false;
     rankBox.hidden = true;
@@ -30,12 +26,7 @@ async function refresh() {
   rankBox.hidden = false;
 }
 
-/** Envia a pontuação ao fim de cada corrida. */
-export function submitScore(pontos) {
-  return api("/api/score", { pontos }).then(refresh).catch(() => {});
-}
-
-/** @param {() => void} onLogin devolve o foco ao jogo */
+/** @param {() => void} onLogin carrega a conta e devolve o foco ao jogo */
 export function initRanking(onLogin) {
   loginBox.querySelector("form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -43,13 +34,10 @@ export function initRanking(onLogin) {
     f.querySelector("button").disabled = true;
     erro.textContent = "";
     try {
-      const res = await api("/api/login", { usuario: f.usuario.value, senha: f.senha.value });
-      const r = await res.json();
-      if (!res.ok) throw new Error(r.erro);
-      localStorage.setItem(TOKEN, r.token);
+      setToken((await api("/api/login", { usuario: f.usuario.value, senha: f.senha.value })).token);
       f.reset();
       loginBox.hidden = true;
-      await refresh();
+      await refreshRanking();
       onLogin();
     } catch (err) {
       erro.textContent = err.message || "Falha no login";
@@ -57,5 +45,5 @@ export function initRanking(onLogin) {
       f.querySelector("button").disabled = false;
     }
   });
-  refresh().catch(() => {});
+  refreshRanking();
 }

@@ -2,7 +2,7 @@
 
 import { Phase } from "./game.js";
 
-const CLIPS = { jump: 0.5, land: 0.5, roll: 0.6, swipe: 0.35, coin: 0.45, stumble: 0.8, crash: 0.9 };
+const CLIPS = { jump: 0.5, land: 0.5, roll: 0.6, swipe: 0.35, coin: 0.45, stumble: 0.8, crash: 0.9, powerup: 0.6, click: 0.5 };
 const MUSIC_VOLUME = 0.45;
 
 export class Audio {
@@ -39,6 +39,11 @@ export class Audio {
   toggleMute() {
     this.muted = !this.muted;
     this.master.gain.value = this.muted ? 0 : 1;
+  }
+
+  /** Efeito avulso (botões, rendimento no banco). */
+  sfx(name, rate = 1) {
+    if (!this.muted) this.#play(name, CLIPS[name], rate);
   }
 
   #play(name, volume, rate = 1, loop = false) {
