@@ -46,7 +46,7 @@ html, body { margin: 0; height: 100%; background: #87c7f2; overflow: hidden; tou
 /* pílula escura dos números */
 .plate {
   position: relative; display: flex; align-items: center; gap: 8px;
-  padding: 2px 16px; border-radius: 999px;
+  padding: .125em 1em; border-radius: 999px;
   background: var(--navy); border: 3px solid var(--ink);
 }
 
@@ -56,17 +56,20 @@ html, body { margin: 0; height: 100%; background: #87c7f2; overflow: hidden; tou
 }
 #pause i { width: 8px; height: 22px; border-radius: 3px; background: #fff; box-shadow: 0 0 0 2px var(--ink); }
 
-.stats { position: absolute; top: 14px; right: 14px; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
-.score { font-size: 40px; --sw: 7px; font-variant-numeric: tabular-nums; }
-.coins { font-size: 30px; color: var(--gold); --sw: 6px; display: inline-block; transform-origin: right center; }
+.stats { position: absolute; top: 14px; right: 14px; display: flex; flex-direction: column; align-items: flex-end; gap: .625em;
+  /* tudo aqui dentro é em: o canto inteiro encolhe no celular e cresce no monitor */
+  font-size: clamp(11px, 1.1vmin + 8px, 22px); }
+.score { font-size: 2.5em; --sw: .175em; font-variant-numeric: tabular-nums; }
+.coins { font-size: 1.875em; color: var(--gold); --sw: .2em; display: inline-block; transform-origin: right center; }
 /* moeda grande "vazando" pela esquerda da pílula */
 .coin-icon {
-  order: -1; margin: -6px 0 -6px -26px;
-  width: 38px; height: 38px; box-sizing: border-box; border-radius: 50%;
+  order: -1; margin: -.375em 0 -.375em -1.625em;
+  flex: none; /* sem isso o flex espreme a moeda até virar um risco */
+  width: 2.375em; height: 2.375em; box-sizing: border-box; border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, rgb(255 246 170), rgb(255 196 20) 55%, rgb(230 140 0));
   border: 3px solid var(--ink); box-shadow: inset 0 0 0 3px rgb(255 230 120);
 }
-.plate:has(.coin-icon) { padding-left: 34px; }
+.plate:has(.coin-icon) { padding-left: 2.125em; }
 
 .menu {
   position: absolute; inset: 0; box-sizing: border-box; padding: max(4vh, 76px) 16px max(5vh, 28px);
@@ -97,9 +100,10 @@ html, body { margin: 0; height: 100%; background: #87c7f2; overflow: hidden; tou
 /* ---------- carteira e dinheiro voando ---------- */
 
 .pots { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-.pot { padding: 3px 12px; border-radius: 999px; font-size: 15px; --sw: 4px; border: 3px solid var(--ink); box-shadow: inset 0 2px 0 rgb(255 255 255 / .4), 0 3px 0 var(--ink); }
+.pot { padding: .2em .8em; border-radius: 999px; font-size: .94em; --sw: .27em; border: 3px solid var(--ink); box-shadow: inset 0 2px 0 rgb(255 255 255 / .4), 0 3px 0 var(--ink); }
 .pot-reserve { background: linear-gradient(#4ee6a8, #059669); }
 .pot-invest { background: linear-gradient(#7cb8ff, #2563eb); }
+.pot-debt { background: linear-gradient(#ff8a8a, #dc2626); }
 
 #floaters { position: absolute; left: 0; right: 0; top: 30%; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .floater { font-size: 26px; --sw: 6px; white-space: nowrap; animation: float-up 1.7s ease-out forwards; }
@@ -226,7 +230,11 @@ body.panel-open .menu { visibility: hidden; }
 }
 
 /* blocos internos: placas escuras com o mesmo contorno */
-.yield, .acc, .move, .projection, .card, .detail { border: 3px solid var(--ink); }
+.yield, .selic, .acc, .move, .projection, .card, .detail { border: 3px solid var(--ink); }
+.selic { padding: 8px 12px; border-radius: 16px; background: rgb(10 20 46 / .5); font-size: 13px; line-height: 1.35; }
+.selic p { margin: 0; }
+.selic b, .selic .changed { color: var(--gold); }
+.selic summary { margin-top: 4px; cursor: pointer; text-decoration: underline; }
 .yield { margin: 0; padding: 10px 12px; border-radius: 16px; text-align: center; background: linear-gradient(#4ee6a8, #059669); box-shadow: inset 0 3px 0 rgb(255 255 255 / .4); }
 .yield b { font-size: 22px; color: #fff59d; --sw: 5px; }
 .accounts { display: grid; gap: 8px; }
@@ -254,11 +262,11 @@ body.panel-open .menu { visibility: hidden; }
 .act-out { background: linear-gradient(#a8b6c8, #475569); }
 .act-goal { background: linear-gradient(#ff8cc6, #be185d); }
 .msg { margin: 0; min-height: 1.2em; font-size: 14px; color: #fff59d; }
-.projection { padding: 10px 12px; border-radius: 16px; background: rgb(10 20 46 / .5); --still: #cbd5e1; --save: #4ade80; --invest: #93c5fd; }
+.projection { padding: 10px 12px; border-radius: 16px; background: rgb(10 20 46 / .5); --still: #cbd5e1; --poup: #fbbf24; --save: #4ade80; --invest: #93c5fd; }
 .projection h3 { margin: 0 0 6px; font-size: 15px; }
 .projection svg { display: block; width: 100%; height: auto; }
 .projection polyline { fill: none; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
-.legend { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 12px; }
+.legend { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 12px; }
 .legend li { display: grid; padding-top: 4px; border-top: 4px solid var(--c); }
 .legend b { font-size: 15px; }
 .note { margin: 6px 0 0; font-size: 11px; font-weight: 600; opacity: .8; }

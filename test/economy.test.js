@@ -2,16 +2,11 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { project, runsUntil } from "../src/edu/bank.js";
+import { monthly, poupanca, project, RATES, runsUntil, setRates } from "../src/edu/bank.js";
 import catalog from "../src/edu/catalog.json" with { type: "json" };
 import { pickTip } from "../src/edu/dicas.js";
-import { COIN, MAGNET_PRICE, portalKinds, SHOCK, Wallet } from "../src/edu/economy.js";
+import { COIN, SHOCK, Wallet } from "../src/edu/economy.js";
 import { Game } from "../src/game.js";
-
-const rng = (seed = 1) => {
-  const g = new Game(seed);
-  return () => g.rand();
-};
 
 test("juros da corrida são compostos e não dependem do tamanho do passo", () => {
   const a = new Wallet(), b = new Wallet();
@@ -24,21 +19,40 @@ test("juros da corrida são compostos e não dependem do tamanho do passo", () =
   assert.ok(Math.abs(a.ledger.juros - (expected - 100000)) < 1e-6);
 });
 
-test("portais só mudam o dinheiro de lugar (menos compra e aposta)", () => {
+test("dívida cresce e as moedas pagam ela primeiro", () => {
   const w = new Wallet();
-  for (let i = 0; i < 100; i++) w.collect();
-  const before = w.total;
-  w.choose("poupar", rng());
-  assert.equal(w.total, before);
-  assert.equal(w.reserve, Math.floor(before / 2));
-  w.choose("investir", rng());
-  assert.equal(w.total, before);
-  w.choose("comprar", rng());
-  assert.equal(w.total, before - MAGNET_PRICE);
-  // sem dinheiro não compra
-  const broke = new Wallet();
-  assert.equal(broke.choose("comprar", rng()).magnet, undefined);
-  assert.equal(broke.total, 0);
+  const MAGNET_PRICE = 10000;
+  w.debt = MAGNET_PRICE;
+  assert.equal(w.total, -MAGNET_PRICE);
+  w.tick(200);
+  const owed = MAGNET_PRICE * (1 + catalog.corrida.jurosCartaoPor100m) ** 2;
+  assert.ok(Math.abs(w.debt - owed) < 1e-6);
+  assert.ok(Math.abs(w.ledger.jurosCartao - (owed - MAGNET_PRICE)) < 1e-6);
+  assert.ok(catalog.corrida.jurosCartaoPor100m > catalog.corrida.jurosPor100m, "dívida custa mais do que o investimento rende");
+  w.collect();
+  assert.equal(w.cash, 0);
+  assert.ok(Math.abs(w.debt - (owed - COIN)) < 1e-6);
+  while (w.debt > 0) w.collect();
+  assert.ok(w.cash > 0 && w.cash < COIN, "a moeda que quita devolve o troco para a carteira");
+  // pontuação nunca fica negativa
+  const g = new Game(1);
+  g.wallet.debt = MAGNET_PRICE;
+  assert.equal(g.score, 0);
+});
+
+test("taxas do banco seguem a Selic", () => {
+  assert.ok(Math.abs((1 + monthly(13.75)) ** 12 - 1.1375) < 1e-12);
+  // poupança: 0,5% ao mês com a Selic acima de 8,5%; senão 70% da Selic
+  assert.equal(poupanca(13.75), 0.005);
+  assert.equal(poupanca(8.5), monthly(8.5 * 0.7));
+  assert.ok(poupanca(13.75) < RATES.cofrinho && RATES.cofrinho < RATES.investimento);
+  const before = { ...RATES };
+  setRates({ selic: 2, cofrinho: monthly(2) });
+  assert.equal(RATES.cofrinho, monthly(2));
+  assert.equal(RATES.conta, 0);
+  setRates(undefined);
+  assert.equal(RATES.selic, 2);
+  setRates(before);
 });
 
 test("reserva absorve uma batida por imprevisto pago", () => {
@@ -48,30 +62,6 @@ test("reserva absorve uma batida por imprevisto pago", () => {
   assert.ok(!w.absorbCrash(), "sobrou menos que um imprevisto");
   assert.equal(w.ledger.reservaUsada, 1);
   assert.ok(w.ledger.batidaSemReserva);
-});
-
-test("aposta perde dinheiro no longo prazo", () => {
-  const rand = rng(42);
-  let net = 0;
-  for (let i = 0; i < 10000; i++) {
-    const w = new Wallet();
-    w.cash = COIN * 10;
-    w.choose("apostar", rand);
-    net += w.cash - COIN * 10;
-  }
-  // esperado: (1/6 − 5/6) da aposta ≈ −67%
-  const mean = net / 10000 / (COIN * 10);
-  assert.ok(mean < -0.55 && mean > -0.78, `média ${mean}`);
-});
-
-test("portal sempre oferece três escolhas diferentes", () => {
-  const rand = rng(3);
-  for (const zone of ["Copacabana", "Lapa", "Santa Teresa"]) {
-    for (let i = 0; i < 200; i++) {
-      const kinds = portalKinds(zone, rand);
-      assert.equal(new Set(kinds).size, 3);
-    }
-  }
 });
 
 test("projeção e corridas até a meta", () => {
@@ -88,7 +78,7 @@ test("projeção e corridas até a meta", () => {
 
 test("dica combina com o que aconteceu", () => {
   const w = new Wallet();
-  assert.match(pickTip(w.ledger), /POUPAR/);
+  assert.match(pickTip(w.ledger), /cofrinho/);
   w.ledger.apostas = 5000;
   assert.match(pickTip(w.ledger), /aposta/i);
 });

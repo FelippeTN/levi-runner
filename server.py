@@ -2,7 +2,8 @@
 
 Primeiro acesso com um usuário novo cria a conta; depois, a mesma senha é exigida.
 O dinheiro mora aqui: o jogo só mostra. Regras e preços vêm de src/edu/catalog.json (o mesmo que o jogo lê).
-Valores em centavos inteiros. Cada corrida de pelo menos `metrosParaMes` conta como um mês de rendimento.
+Valores em centavos inteiros. Cada corrida de pelo menos `metrosParaMes` conta como um mês de rendimento,
+à taxa Selic do Banco Central (buscada a cada 24 h; sem rede vale a última gravada ou a reserva do catálogo).
 Uso: python3 server.py [porta]   (padrão 8042; só biblioteca padrão; LEVI_DB troca o arquivo do banco)
 """
 
@@ -14,6 +15,8 @@ import secrets
 import sqlite3
 import sys
 import threading
+import time
+import urllib.request
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -41,6 +44,7 @@ db.executescript("""
         pintura text not null default 'classico',
         acessorio text
     );
+    create table if not exists taxas (serie text primary key, valor real not null, buscado_em integer not null);
 """)
 if "pw" not in [c[1] for c in db.execute("pragma table_info(players)")]:
     db.execute("alter table players add column pw text")  # bancos da versão com LDAP
@@ -69,6 +73,67 @@ def check_or_create(login, password):
     return secrets.compare_digest(stored, hash_pw(password, stored.split("$")[0]))
 
 
+# ---------- Taxas do Banco Central (SGS): Selic meta e IPCA de 12 meses, em % ao ano ----------
+
+SERIES = {"selic": 432, "ipca": 13522}
+
+
+def baixar(serie):
+    # a API às vezes responde 304 sem corpo para `ultimos/1` (visto na série da Selic); pedir mais registros contorna
+    for n in (1, 2, 3):
+        try:
+            with urllib.request.urlopen(f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{serie}/dados/ultimos/{n}?formato=json", timeout=5) as r:
+                return float(json.load(r)[-1]["valor"])
+        except urllib.error.HTTPError as e:
+            erro = e
+    raise erro
+
+
+def atualizar_taxas(baixar=baixar):
+    """Grava o valor de hoje de cada série; sem rede ou com resposta estranha, fica o último gravado."""
+    for nome, serie in SERIES.items():
+        try:
+            valor = baixar(serie)
+            if not 0 <= valor < 100:
+                raise ValueError(valor)
+            sql("insert into taxas values (?, ?, ?) on conflict(serie) do update set valor = excluded.valor, buscado_em = excluded.buscado_em",
+                nome, valor, int(time.time()))
+        except (OSError, ValueError, KeyError, IndexError, TypeError) as e:
+            print(f"Banco Central indisponível ({nome}): {e!r}", file=sys.stderr)
+
+
+def manter_taxas():
+    """Consulta o Banco Central uma vez a cada 24 h, contadas da última consulta gravada (reiniciar o servidor não consulta de novo)."""
+    dia = 24 * 3600
+    while True:
+        n, ultima = sql("select count(*), min(buscado_em) from taxas")[0]
+        espera = (ultima + dia - time.time()) if n == len(SERIES) else 0
+        if espera <= 0:
+            atualizar_taxas()
+            espera = dia
+        time.sleep(espera)
+
+
+def mensal(ao_ano):
+    """Taxa % ao ano → fração ao mês equivalente (juros compostos)."""
+    return (1 + ao_ano / 100) ** (1 / 12) - 1
+
+
+def taxas():
+    """Taxas em vigor: do Banco Central se já vieram alguma vez; senão a reserva do catálogo."""
+    rows = {s: (v, t) for s, v, t in sql("select serie, valor, buscado_em from taxas")}
+    selic, quando = rows.get("selic", (BANCO["selicReserva"], None))
+    m = mensal(selic)
+    return {
+        "selic": selic,
+        "ipca": rows.get("ipca", (BANCO["ipcaReserva"], None))[0],
+        "cofrinho": m * BANCO["pctSelicCofrinho"],
+        "investimento": m * BANCO["pctSelicInvestimento"],
+        "consultado": time.strftime("%d/%m/%Y", time.localtime(quando)) if quando else BANCO["reservaData"],
+        "ao_vivo": quando is not None,
+    }
+
+
 # ---------- Banco do Levi: regras puras sobre um dict (testadas em tests/test_server.py) ----------
 
 class Recusado(Exception):
@@ -79,8 +144,8 @@ def render(valor, taxa):
     return int(valor * taxa + 0.5)
 
 
-def fim_de_corrida(acc, distancia, patrimonio):
-    """Deposita o que a corrida juntou e, se a corrida valeu um mês, aplica o rendimento. Devolve o resumo."""
+def fim_de_corrida(acc, distancia, patrimonio, tx):
+    """Deposita o que a corrida juntou e, se a corrida valeu um mês, aplica o rendimento de `tx` (ver `taxas`). Devolve o resumo."""
     distancia = max(0, min(int(distancia), 1_000_000))
     # ponytail: o patrimônio vem do cliente; o teto pela distância só limita o estrago de quem forjar
     deposito = max(0, min(int(patrimonio), distancia * BANCO["tetoPorMetro"]))
@@ -90,11 +155,11 @@ def fim_de_corrida(acc, distancia, patrimonio):
         return resumo
     acc["mes"] += 1
     resumo["mes"] = True
-    resumo["cofrinho"] = render(acc["cofrinho"], BANCO["cofrinho"])
+    resumo["cofrinho"] = render(acc["cofrinho"], tx["cofrinho"])
     acc["cofrinho"] += resumo["cofrinho"]
     ativas = []
     for ap in acc["aplicacoes"]:
-        r = render(ap["valor"], BANCO["investimento"])
+        r = render(ap["valor"], tx["investimento"])
         ap["valor"] += r
         resumo["investimento"] += r
         if acc["mes"] >= ap["libera_em"]:
@@ -204,7 +269,9 @@ class Handler(SimpleHTTPRequestHandler):
             if not login:
                 return self.send_json({"erro": "Faça login"}, 401)
             with db_lock:
-                return self.send_json(carregar(login))
+                return self.send_json({**carregar(login), "taxas": taxas()})
+        if self.path == "/api/taxas":
+            return self.send_json(taxas())
         if self.path != "/api/ranking":
             return super().do_GET()
         top = sql("select name, best, login from players where best > 0 order by best desc limit 10")
@@ -246,7 +313,7 @@ class Handler(SimpleHTTPRequestHandler):
                     # ponytail: a pontuação vem do cliente e dá para forjar; validar no servidor se virar competição séria
                     score = max(0, min(int(body.get("pontos", 0)), 10_000_000))
                     sql("update players set best = max(best, ?) where login = ?", score, login)
-                    resumo = fim_de_corrida(acc, body.get("distancia", 0), body.get("patrimonio", 0))
+                    resumo = fim_de_corrida(acc, body.get("distancia", 0), body.get("patrimonio", 0), taxas())
                 elif self.path == "/api/banco":
                     movimentar(acc, body.get("acao"), body.get("valor"))
                 elif self.path == "/api/loja":
@@ -260,10 +327,11 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({"erro": "Dados inválidos"}, 400)
         except Recusado as e:
             return self.send_json({"erro": str(e)}, 400)
-        self.send_json({**acc, "resumo": resumo})
+        self.send_json({**acc, "resumo": resumo, "taxas": taxas()})
 
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8042
+    threading.Thread(target=manter_taxas, daemon=True).start()
     print(f"Levi Runner em http://0.0.0.0:{port}")
     ThreadingHTTPServer(("0.0.0.0", port), partial(Handler, directory=os.path.join(ROOT, "dist"))).serve_forever()

@@ -1,16 +1,29 @@
-// Painel do Banco do Levi: conta, cofrinho e investimentos; guardar, sacar, investir; rendimento do mês e
-// projeção de 12 corridas. O servidor confere tudo; aqui só pede e mostra.
+// Painel do Banco do Levi: conta, cofrinho e investimentos; guardar, sacar, investir; rendimento do mês,
+// a Selic do dia e projeção de 12 corridas. O servidor confere tudo; aqui só pede e mostra.
 
-import { LOCK_MONTHS, project, RATES } from "../edu/bank.js";
+import { store } from "../account.js";
+import { LOCK_MONTHS, poupanca, project, RATES } from "../edu/bank.js";
+import { aoAno, inflacao, SELIC_EXPLICA, selicMudou } from "../edu/dicas.js";
 import { brl } from "../edu/economy.js";
 
 const MONTHS = 12;
-const pct = (r) => `${(r * 100).toLocaleString("pt-BR")}%`;
+const SELIC_SEEN = "levi-selic";
+const pct = (r) => `${(r * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+
+/** Faixa da Selic: taxa do dia com fonte e data, o que ela vira no jogo e a explicação. */
+const selicBox = (notice) => `
+  <div class="selic">
+    ${notice ? `<p class="changed">${notice}</p>` : ""}
+    <p><b>Selic ${RATES.ao_vivo ? "hoje" : "de referência"}: ${aoAno(RATES.selic)}% ao ano</b> · Banco Central, ${RATES.consultado}</p>
+    <p>No jogo, 1 corrida = 1 mês: o cofrinho rende <b>${pct(RATES.cofrinho)}</b> por corrida.</p>
+    <details><summary>O que é a Selic?</summary><p>${SELIC_EXPLICA}</p></details>
+  </div>`;
 
 /** Gráfico de linhas em SVG: o mesmo valor parado, no cofrinho e investido ao longo de 12 corridas. */
 function chart(value) {
   const series = [
     ["Parado", 0, "var(--still)"],
+    ["Poupança", poupanca(RATES.selic), "var(--poup)"],
     ["Cofrinho", RATES.cofrinho, "var(--save)"],
     ["Investido", RATES.investimento, "var(--invest)"],
   ].map(([name, rate, color]) => ({ name, color, points: project(value, rate, MONTHS) }));
@@ -27,7 +40,8 @@ function chart(value) {
   return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Projeção de ${brl(value)} em ${MONTHS} corridas">${lines}</svg><ul class="legend">${legend}</ul>`;
 }
 
-const projection = (value) => `<h3>Se ${brl(value)} ficar ${MONTHS} corridas…</h3>${chart(value)}`;
+const projection = (value) =>
+  `<h3>Se ${brl(value)} ficar ${MONTHS} corridas…</h3>${chart(value)}<p class="note">${inflacao(value, RATES.ipca, MONTHS)}</p>`;
 
 /**
  * @param {HTMLElement} sheet
@@ -40,6 +54,7 @@ export function bankPanel(sheet, account, hooks) {
   let amount = "";
   let message = "";
   let celebrated = null;
+  let notice = "";
 
   const render = () => {
     const d = account.data;
@@ -47,6 +62,7 @@ export function bankPanel(sheet, account, hooks) {
       month.textContent = "";
       body.innerHTML = `
         <p class="lead">Aqui seu dinheiro fica guardado entre as corridas e <b>rende</b>. Com o rendimento você compra skins na loja.</p>
+        ${selicBox(notice)}
         <button class="play-button wide" data-act="login">ENTRAR PARA ABRIR MINHA CONTA</button>`;
       return;
     }
@@ -63,10 +79,11 @@ export function bankPanel(sheet, account, hooks) {
     const gain = r && r.mes ? r.cofrinho + r.investimento : 0;
     body.innerHTML = `
       ${gain > 0 ? `<p class="yield">Seu dinheiro rendeu <b data-count="${gain}">${brl(0)}</b> nesta corrida!${r.liberado ? ` · ${brl(r.liberado)} de investimento liberado na conta` : ""}</p>` : ""}
+      ${selicBox(notice)}
       <div class="accounts">
-        <article class="acc acc-conta"><h3>CONTA</h3><b>${brl(d.conta)}</b><p>parado, não rende · é o que você gasta na loja</p></article>
-        <article class="acc acc-save"><h3>COFRINHO</h3><b>${brl(d.cofrinho)}</b><p>rende ${pct(RATES.cofrinho)} por corrida · saca quando quiser</p></article>
-        <article class="acc acc-invest"><h3>INVESTIMENTOS</h3><b>${brl(invested)}</b><p>rende ${pct(RATES.investimento)} por corrida · fica travado ${LOCK_MONTHS} corridas</p>${lots ? `<ul>${lots}</ul>` : ""}</article>
+        <article class="acc acc-conta"><h3>CONTA</h3><b>${brl(d.conta)}</b><p>parado, não rende e perde para a inflação · é o que você gasta na loja</p></article>
+        <article class="acc acc-save"><h3>COFRINHO</h3><b>${brl(d.cofrinho)}</b><p>rende a Selic: ${pct(RATES.cofrinho)} por corrida · saca quando quiser</p></article>
+        <article class="acc acc-invest"><h3>INVESTIMENTOS</h3><b>${brl(invested)}</b><p>rende mais que o cofrinho: ${pct(RATES.investimento)} por corrida · fica travado ${LOCK_MONTHS} corridas</p>${lots ? `<ul>${lots}</ul>` : ""}</article>
       </div>
       <div class="move">
         <label>Valor <span>R$</span><input id="bank-amount" type="number" inputmode="numeric" min="1" step="1" value="${amount}" placeholder="0"></label>
@@ -82,7 +99,7 @@ export function bankPanel(sheet, account, hooks) {
       </div>
       <div class="projection">
         <div class="projection-chart">${projection(preview)}</div>
-        <p class="note">Percentuais de jogo. No mundo real as taxas mudam, e guardar sempre vence deixar parado.</p>
+        <p class="note">Selic e IPCA do Banco Central na data indicada; poupança pela regra oficial, sem a TR. As taxas mudam, e rendimento passado não garante o futuro.</p>
       </div>`;
     const counter = body.querySelector("[data-count]");
     if (counter && celebrated !== r) {
@@ -143,6 +160,10 @@ export function bankPanel(sheet, account, hooks) {
   return {
     show() {
       message = "";
+      // só compara taxa vinda do Banco Central: a de reserva não é "mudança"
+      const seen = store.get(SELIC_SEEN, null);
+      notice = RATES.ao_vivo && seen !== null && seen !== RATES.selic ? selicMudou(seen, RATES.selic, pct(RATES.cofrinho)) : "";
+      if (RATES.ao_vivo) store.set(SELIC_SEEN, RATES.selic);
       render();
     },
   };

@@ -1,13 +1,14 @@
 // Conta do jogador no Banco do Levi. O servidor é dono do dinheiro; aqui fica a cópia para mostrar.
 
 import { api, loggedIn } from "./api.js";
+import { setRates } from "./edu/bank.js";
 
 const GOAL = "levi-meta";
 const EARNINGS = "levi-ganhos";
 /** palpite de quanto uma corrida rende antes de haver histórico */
 const DEFAULT_PER_RUN = 50000;
 
-const store = {
+export const store = {
   get(key, fallback) {
     try {
       return JSON.parse(localStorage.getItem(key)) ?? fallback;
@@ -40,6 +41,8 @@ export class Account extends EventTarget {
     } catch {
       this.data = null;
     }
+    // sem server.py ficam as taxas de reserva do catálogo
+    await api("/api/taxas").then(setRates, () => {});
     this.#changed();
   }
 
@@ -49,6 +52,7 @@ export class Account extends EventTarget {
     const r = await api("/api/corrida", { pontos, distancia: Math.floor(distancia), patrimonio });
     this.lastRun = r.resumo;
     this.data = r;
+    setRates(r.taxas);
     store.set(EARNINGS, [r.resumo.deposito, ...store.get(EARNINGS, [])].slice(0, 5));
     this.#changed();
     return r.resumo;
@@ -56,6 +60,7 @@ export class Account extends EventTarget {
 
   async #post(path, body) {
     this.data = await api(path, body);
+    setRates(this.data.taxas);
     this.#changed();
   }
   bank(acao, valor) {

@@ -146,7 +146,6 @@ function frame(now) {
   }
   world.decorate();
   art.animateSea(elapsed);
-  world.props.animate(elapsed);
   world.spawnRows();
   world.collide(player, events);
   const interest = game.phase === Phase.Playing && game.wallet.takeInterest(300);

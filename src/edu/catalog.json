@@ -1,19 +1,19 @@
 {
-  "_leia": "Regras e preços do dinheiro do jogo, lidos pelo jogo e pelo server.py. Valores em centavos. Taxas são de jogo, não do mundo real.",
+  "_leia": "Regras e preços do dinheiro do jogo, lidos pelo jogo e pelo server.py. Valores em centavos. O banco rende a Selic do Banco Central (o server.py busca); as taxas da corrida são de jogo.",
   "moeda": 1000,
   "imprevisto": 5000,
   "corrida": {
     "jurosPor100m": 0.02,
-    "parteDoPortal": 0.5,
-    "apostaUmEm": 6,
-    "imaSegundos": 8,
-    "portalACada": 250
+    "jurosCartaoPor100m": 0.1
   },
   "banco": {
     "metrosParaMes": 200,
     "tetoPorMetro": 2000,
-    "cofrinho": 0.01,
-    "investimento": 0.03,
+    "pctSelicCofrinho": 1,
+    "pctSelicInvestimento": 1.3,
+    "selicReserva": 13.75,
+    "ipcaReserva": 4.58,
+    "reservaData": "11/11/2026",
     "carencia": 6
   },
   "skins": [

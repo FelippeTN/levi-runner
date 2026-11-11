@@ -1,9 +1,6 @@
 import { FIRST_ROW, START_SPEED } from "./config.js";
 import { Wallet } from "./edu/economy.js";
 
-/** Distância do primeiro portal de decisão (dá tempo de juntar algumas moedas antes). */
-const FIRST_PORTAL = 150;
-
 export const Phase = Object.freeze({
   Ready: "ready",
   Playing: "playing",
@@ -28,8 +25,6 @@ export class Game {
     /** dinheiro da corrida: carteira, reserva e investimento */
     this.wallet = new Wallet();
     this.nextSpawn = FIRST_ROW;
-    /** distância em que a próxima fileira vira portal de decisão */
-    this.nextPortal = FIRST_PORTAL;
     /** segundos desde o último tropeço (dois em 3 s = fim) */
     this.sinceStumble = 99;
     this.dying = 0;
@@ -37,7 +32,7 @@ export class Game {
 
   /** Distância + patrimônio em reais: o ranking premia quem guarda e investe, não só quem corre. */
   get score() {
-    return Math.floor(this.distance) + Math.floor(this.wallet.total / 100);
+    return Math.max(0, Math.floor(this.distance) + Math.floor(this.wallet.total / 100));
   }
 
   /** xorshift32: determinístico, a mesma semente monta o mesmo Rio. */

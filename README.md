@@ -1,9 +1,13 @@
 # Levi Runner
 
 Endless runner de 3 faixas no Rio (Copacabana → Lapa → Santa Teresa), feito com three.js, com educação
-financeira para o PGE Educa: na corrida, portais POUPAR / INVESTIR / COMPRAR / APOSTAR e a reserva de emergência
-como vida extra; entre corridas, o Banco do Levi (cofrinho e investimentos que rendem a cada corrida) e a loja de
+financeira para o PGE Educa: na corrida, moedas; entre corridas, o Banco do Levi (cofrinho e investimentos que rendem a cada corrida) e a loja de
 skins paga com esse dinheiro.
+
+O cofrinho rende a **Selic real**: o `server.py` busca a Selic meta e o IPCA de 12 meses na API do Banco Central
+(`api.bcb.gov.br`, séries 432 e 13522) uma vez a cada 24 h, e cada corrida de 200 m ou mais vale um mês dessa taxa.
+O investimento travado paga 130% dela. Sem saída HTTPS para o Banco Central, vale a última taxa gravada ou a reserva
+do `catalog.json` (`selicReserva`, `ipcaReserva`), e a tela mostra "Selic de referência".
 
 ## Rodar
 
@@ -26,9 +30,9 @@ pnpm test              # física, colisão, economia, malhas, sombra (node) e re
 | `src/world/zones.js`, `props.js`, `backdrop.js` | Bairros, veículos/cavaletes/placas, fundo (Pão de Açúcar, Cristo) |
 | `src/world/textures.js`, `geometry.js`, `art.js` | Texturas e malhas geradas em código, materiais |
 | `src/fx.js`, `src/render.js` | Câmera, sol com sombra estável, partículas, bloom e tone mapping |
-| `src/edu/catalog.json` | **Regras e preços** do dinheiro (moeda, taxas, carência, skins), lidos pelo jogo e pelo servidor |
-| `src/edu/economy.js`, `bank.js` | Carteira da corrida, portais, juros; projeções do banco |
-| `src/edu/dicas.js` | Textos da "Dica do Levi" (para a equipe do PGE Educa revisar) |
+| `src/edu/catalog.json` | **Regras e preços** do dinheiro (moeda, % da Selic, juros da corrida, carência, skins), lidos pelo jogo e pelo servidor |
+| `src/edu/economy.js`, `bank.js` | Carteira da corrida, portais, juros, dívida; taxas em vigor, poupança e projeções do banco |
+| `src/edu/dicas.js` | Textos da "Dica do Levi" e do banco (para a equipe do PGE Educa revisar) |
 | `src/skins.js` | Pinturas e acessórios do Levi |
 | `src/ui/` | HUD da corrida, menu e extrato, painéis do Banco e da Loja |
 | `src/account.js`, `src/api.js`, `src/ranking.js` | Conta no banco, cliente da API, login e ranking |

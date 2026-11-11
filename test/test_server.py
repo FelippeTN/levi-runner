@@ -11,6 +11,7 @@ os.environ["LEVI_DB"] = ":memory:"  # antes do import: não toca no ranking.db d
 import server  # noqa: E402
 
 B = server.BANCO
+TX = {"cofrinho": 0.01, "investimento": 0.03}
 MES = B["metrosParaMes"]
 
 
@@ -21,23 +22,23 @@ def conta(**kw):
 class Banco(unittest.TestCase):
     def test_corrida_deposita_e_rende_uma_vez(self):
         acc = conta(cofrinho=100_000)
-        r = server.fim_de_corrida(acc, MES, 5_000)
+        r = server.fim_de_corrida(acc, MES, 5_000, TX)
         self.assertEqual(acc["conta"], 5_000)
-        self.assertEqual(r["cofrinho"], round(100_000 * B["cofrinho"]))
+        self.assertEqual(r["cofrinho"], round(100_000 * TX["cofrinho"]))
         self.assertEqual(acc["cofrinho"], 100_000 + r["cofrinho"])
         self.assertEqual(acc["mes"], 1)
 
     def test_corrida_curta_nao_rende(self):
         acc = conta(cofrinho=100_000)
-        r = server.fim_de_corrida(acc, MES - 1, 5_000)
+        r = server.fim_de_corrida(acc, MES - 1, 5_000, TX)
         self.assertFalse(r["mes"])
         self.assertEqual((acc["cofrinho"], acc["mes"], acc["conta"]), (100_000, 0, 5_000))
 
     def test_deposito_tem_teto_pela_distancia(self):
         acc = conta()
-        server.fim_de_corrida(acc, 10, 10**12)
+        server.fim_de_corrida(acc, 10, 10**12, TX)
         self.assertEqual(acc["conta"], 10 * B["tetoPorMetro"])
-        server.fim_de_corrida(acc, -5, -100)
+        server.fim_de_corrida(acc, -5, -100, TX)
         self.assertEqual(acc["conta"], 10 * B["tetoPorMetro"])
 
     def test_investimento_fica_travado_ate_o_prazo(self):
@@ -45,12 +46,12 @@ class Banco(unittest.TestCase):
         server.movimentar(acc, "investir", 100_000)
         self.assertEqual(acc["conta"], 0)
         for _ in range(B["carencia"] - 1):
-            server.fim_de_corrida(acc, MES, 0)
+            server.fim_de_corrida(acc, MES, 0, TX)
             self.assertEqual(acc["conta"], 0)
-        r = server.fim_de_corrida(acc, MES, 0)
+        r = server.fim_de_corrida(acc, MES, 0, TX)
         esperado = 100_000
         for _ in range(B["carencia"]):
-            esperado += server.render(esperado, B["investimento"])
+            esperado += server.render(esperado, TX["investimento"])
         self.assertEqual(r["liberado"], esperado)
         self.assertEqual((acc["conta"], acc["aplicacoes"]), (esperado, []))
         self.assertIsInstance(acc["conta"], int)
@@ -88,6 +89,27 @@ class Banco(unittest.TestCase):
         acc["aplicacoes"].append({"valor": 1, "libera_em": 6})
         server.salvar("teste", acc)
         self.assertEqual(server.carregar("teste"), acc)
+
+    def test_taxas_seguem_a_selic_e_caem_para_a_reserva(self):
+        def falha(serie):
+            raise OSError("sem rede")
+
+        server.atualizar_taxas(falha)
+        t = server.taxas()
+        self.assertEqual((t["selic"], t["ao_vivo"], t["consultado"]), (B["selicReserva"], False, B["reservaData"]))
+        # 12 meses compostos da taxa mensal devolvem a taxa do ano
+        self.assertAlmostEqual((1 + server.mensal(13.75)) ** 12, 1.1375)
+
+        server.atualizar_taxas(lambda serie: {432: 10.0, 13522: 4.0}[serie])
+        t = server.taxas()
+        self.assertEqual((t["selic"], t["ipca"], t["ao_vivo"]), (10.0, 4.0, True))
+        self.assertAlmostEqual(t["cofrinho"], server.mensal(10) * B["pctSelicCofrinho"])
+        self.assertAlmostEqual(t["investimento"], server.mensal(10) * B["pctSelicInvestimento"])
+
+        # resposta estranha do Banco Central não apaga o último valor bom
+        for ruim in (lambda s: 500.0, lambda s: float("x"), lambda s: [][0]):
+            server.atualizar_taxas(ruim)
+        self.assertEqual(server.taxas()["selic"], 10.0)
 
 
 if __name__ == "__main__":

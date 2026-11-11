@@ -77,6 +77,7 @@ export class Menu {
       ["Moedas", `+${brl(l.moedas)}`, "good"],
       l.juros >= 1 && ["Juros recebidos", `+${brl(l.juros)}`, "good"],
       l.compras && ["Compras", `−${brl(l.compras)}`, "bad"],
+      l.jurosCartao >= 1 && ["Juros do cartão", `−${brl(l.jurosCartao)}`, "bad"],
       l.apostas > 0 && ["Apostas", `−${brl(l.apostas)}`, "bad"],
       l.apostas < 0 && ["Apostas (sorte, desta vez)", `+${brl(-l.apostas)}`, ""],
       l.reservaUsada && ["Reserva te salvou", `${l.reservaUsada}×`, "good"],
@@ -115,8 +116,9 @@ export class Menu {
     const total = this.account.total, per = this.account.perRun;
     const saving = runsUntil(skin.preco, total, per, 0), investing = runsUntil(skin.preco, total, per, RATES.investimento);
     el.style.setProperty("--p", `${Math.min(100, (100 * total) / skin.preco).toFixed(1)}%`);
+    const pct = Math.floor((100 * total) / skin.preco);
     el.innerHTML =
-      `<b>META: ${skin.nome}</b> ${brl(total)} de ${brl(skin.preco)}` +
-      `<small>faltam ${runsText(saving)} · investindo, ${runsText(investing)}</small>`;
+      `<b>META: ${skin.nome}</b> ${brl(total)} de ${brl(skin.preco)} (${pct}%)` +
+      `<small>Guardando: ${runsText(saving)} · Investindo: <strong>${runsText(investing)}</strong></small>`;
   }
 }
