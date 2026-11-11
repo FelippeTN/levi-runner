@@ -60,7 +60,7 @@ export class Menu {
     if (game.phase === this.#phase) return;
     this.#phase = game.phase;
     const over = game.phase === Phase.Over;
-    $("title").textContent = over ? "FIM DE\nJOGO" : "LEVI\nRUNNER";
+    $("title").textContent = over ? "FIM DE JOGO" : "LEVI RUNNER";
     $("banner").hidden = over;
     $("statement").hidden = !over;
     if (game.phase === Phase.Ready) this.#renderGoal();

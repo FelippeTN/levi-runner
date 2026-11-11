@@ -85,6 +85,7 @@ export class Hud {
     this.#set("cash", brl(w.cash));
     this.#set("reserve", w.reserve > 0 ? `RESERVA ${brl(w.reserve)}` : "", true);
     this.#set("invested", w.invested > 0 ? `INVESTIDO ${brl(w.invested)}` : "", true);
-    this.#set("sound", muted ? "SOM: DESLIGADO" : "SOM: LIGADO");
+    this.#set("sound", muted ? "🔇" : "🔊");
+    $("sound").ariaLabel = muted ? "Ligar som" : "Desligar som";
   }
 }

@@ -29,19 +29,17 @@
   <!-- início / fim de jogo: selo do título no alto, extrato e navegação embaixo (o Levi fica no meio) -->
   <div class="menu" data-show="menu">
     <div class="top">
+      <!-- logo: Pão de Açúcar com bondinho, nome e a onda do calçadão de Copacabana -->
       <div class="badge">
-        <div class="bubbles">
-          <b style="width:30%;left:6%;top:26%"></b>
-          <b style="width:28%;left:64%;top:18%"></b>
-          <b style="width:18%;left:0;top:8%"></b>
-          <b style="width:16%;left:82%;top:4%"></b>
-          <b style="width:20%;left:20%;top:58%"></b>
-          <b style="width:16%;left:66%;top:66%"></b>
-          <b style="width:46%;left:27%;top:0"></b>
-          <h1 id="title">LEVI
-RUNNER</h1>
-        </div>
-        <p id="banner" class="banner">Rio de Janeiro</p>
+        <svg class="skyline" viewBox="0 0 240 64" aria-hidden="true">
+          <circle class="sun" cx="204" cy="18" r="10"/>
+          <path class="hill" d="M0 64 L0 58 C18 56 34 40 58 36 C78 34 90 46 100 50 C112 38 126 12 140 7 C152 3 160 6 166 14 C178 30 196 52 240 60 L240 64 Z"/>
+          <path class="cable" d="M58 36 L146 6 M102.5 21 V23"/>
+          <rect class="car" x="98" y="23" width="9" height="6" rx="1.5"/>
+        </svg>
+        <h1 id="title">LEVI RUNNER</h1>
+        <svg class="calcadao" viewBox="0 0 240 12" preserveAspectRatio="none" aria-hidden="true"><path d="M0 6 q6 -6 12 0 q6 6 12 0 q6 -6 12 0 q6 6 12 0 q6 -6 12 0 q6 6 12 0 q6 -6 12 0 q6 6 12 0 q6 -6 12 0 q6 6 12 0 q6 -6 12 0 q6 6 12 0 q6 -6 12 0 q6 6 12 0 q6 -6 12 0 q6 6 12 0 q6 -6 12 0 q6 6 12 0 q6 -6 12 0 q6 6 12 0"/></svg>
+        <p id="banner" class="banner">RIO DE JANEIRO</p>
       </div>
       <button id="goal" class="goal" hidden></button>
     </div>
@@ -54,9 +52,9 @@ RUNNER</h1>
     </section>
 
     <nav class="menu-nav">
-      <button id="open-bank" class="blue-button nav-button">BANCO</button>
-      <button id="play" class="play-button">JOGAR</button>
-      <button id="open-shop" class="blue-button nav-button">LOJA</button>
+      <button id="open-bank" class="blue-button nav-button"><i aria-hidden="true">🏦</i>BANCO</button>
+      <button id="play" class="play-button"><i class="play-icon" aria-hidden="true"></i>JOGAR</button>
+      <button id="open-shop" class="blue-button nav-button"><i aria-hidden="true">🛒</i>LOJA</button>
     </nav>
   </div>
 
