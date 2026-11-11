@@ -5,33 +5,54 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 <title>Levi Runner</title>
 <link rel="icon" href="data:,">
-<style>
-  html, body { margin: 0; height: 100%; background: #87c7f2; overflow: hidden; touch-action: none; }
-  #bevy { width: 100%; height: 100%; display: block; outline: none; }
-  #loading { position: fixed; inset: 0; display: grid; place-items: center; font: 600 22px system-ui, sans-serif; color: #fff; text-shadow: 0 2px 4px #0006; pointer-events: none; }
-  /* mesmo estilo do HUD do jogo: placas escuras, títulos amarelos, botões gordinhos com degrau */
-  #login { position: fixed; inset: 0; display: grid; place-items: center; background: #04122acc; z-index: 2; font: 700 16px system-ui, sans-serif; }
-  #login[hidden] { display: none; }
-  #login form { display: grid; gap: 12px; width: min(340px, calc(100vw - 32px)); padding: 26px 24px 22px; border-radius: 24px; background: linear-gradient(#4da8ff, #0f58d8); border: 4px solid #fff; box-shadow: 0 8px 0 #06266b, 0 20px 40px #0007; transform: rotate(-1.5deg); }
-  #login h1 { margin: 0 0 4px; font-size: 40px; line-height: 1; text-align: center; color: #ffdb1f; text-shadow: 0 5px 0 #08193f; letter-spacing: .02em; }
-  #login input { font: inherit; padding: 12px 14px; border-radius: 14px; border: 3px solid #0b3c99; background: #fff; color: #08193f; }
-  #login button { font: 800 20px system-ui, sans-serif; padding: 12px; border-radius: 16px; border: 3px solid #fff; background: linear-gradient(#ffe066, #ffab0a); color: #08193f; box-shadow: 0 6px 0 #a35f00; cursor: pointer; transition: transform .08s, box-shadow .08s; }
-  #login button:active { transform: translateY(4px); box-shadow: 0 2px 0 #a35f00; }
-  #login button:disabled { opacity: .6; cursor: wait; }
-  #login-erro { min-height: 1.2em; margin: 0; color: #ffe1e1; font-size: 13px; }
-  #ranking { position: fixed; top: 82px; left: 14px; width: 230px; padding: 10px 14px 12px; border-radius: 14px; background: #020a1ab8; border-top: 2px solid #ffffff40; color: #fff; font: 700 15px system-ui, sans-serif; pointer-events: none; }
-  #ranking[hidden] { display: none; }
-  #ranking h2 { margin: 0 0 6px; font-size: 16px; letter-spacing: .08em; color: #ffdb1f; text-shadow: 0 2px 0 #08193f; }
-  #ranking ol { margin: 0; padding-left: 22px; }
-  #ranking li { display: flex; gap: 8px; }
-  #ranking li span:first-child { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  #ranking li.eu { color: #ffdb1f; }
-  #ranking p { margin: 6px 0 0; font-size: 13px; opacity: .85; }
-</style>
 </head>
 <body>
-<canvas id="bevy" tabindex="0"></canvas>
+<canvas id="game" tabindex="0"></canvas>
+
+<div id="hud">
+  <!-- pausa (canto superior esquerdo) -->
+  <button id="pause" class="blue-button" data-show="playing paused" aria-label="Pausar"><i></i><i></i></button>
+
+  <!-- pontos e moedas empilhados no canto superior direito -->
+  <div class="stats">
+    <div class="plate" data-show="playing paused"><span id="score" class="score"></span></div>
+    <div class="plate"><span id="coins" class="coins">0</span><span class="coin-icon"></span></div>
+  </div>
+
+  <!-- início / fim de jogo: selo do título no alto, "toque para jogar" embaixo (o Levi fica no meio) -->
+  <div class="menu" data-show="menu">
+    <div class="badge">
+      <div class="bubbles">
+        <b style="width:30%;left:6%;top:26%"></b>
+        <b style="width:28%;left:64%;top:18%"></b>
+        <b style="width:18%;left:0;top:8%"></b>
+        <b style="width:16%;left:82%;top:4%"></b>
+        <b style="width:20%;left:20%;top:58%"></b>
+        <b style="width:16%;left:66%;top:66%"></b>
+        <b style="width:46%;left:27%;top:0"></b>
+        <h1 id="title"></h1>
+      </div>
+      <p id="banner" class="banner"></p>
+    </div>
+    <p id="cta" class="cta"></p>
+  </div>
+
+  <div class="paused" data-show="paused">
+    <h2>PAUSA</h2>
+    <p>Esc ou toque no botão para continuar</p>
+  </div>
+
+  <!-- som (canto inferior direito) e dicas (inferior esquerdo) nos menus -->
+  <button id="sound" class="blue-button" data-show="menu paused"></button>
+  <p class="plate hint" data-show="menu paused">Espaço ou toque: jogar
+← → trocar de faixa   ↑ pular   ↓ rolar
+Esc pausa   M som</p>
+
+  <p id="zone" class="zone"></p>
+</div>
+
 <div id="loading">Carregando o Levi…</div>
+
 <div id="login" hidden>
   <form>
     <h1>Levi Runner</h1>
@@ -42,68 +63,7 @@
   </form>
 </div>
 <aside id="ranking" hidden><h2>RANKING</h2><ol></ol><p></p></aside>
-<script>
-  // Login com conta local (via server.py; o 1º acesso cria a conta) e ranking no canto superior direito.
-  const api = (path, body) => fetch(path, {
-    method: body ? "POST" : "GET",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer " + (localStorage.getItem("levi-token") || "") },
-    body: body && JSON.stringify(body),
-  });
-  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-  const loginBox = document.getElementById("login");
-  const rankBox = document.getElementById("ranking");
 
-  async function ranking() {
-    const r = await (await api("/api/ranking")).json();
-    if (!r.eu) { loginBox.hidden = false; rankBox.hidden = true; return; }
-    rankBox.querySelector("ol").innerHTML = r.top
-      .map((p) => `<li class="${p.eu ? "eu" : ""}"><span>${esc(p.nome)}</span><span>${p.pontos}</span></li>`).join("");
-    rankBox.querySelector("p").textContent = `Você: ${r.eu.nome} — recorde ${r.eu.pontos}`;
-    rankBox.hidden = false;
-  }
-
-  // chamada pelo jogo (src/main.rs) ao fim de cada corrida
-  window.leviGameOver = (pontos) => api("/api/score", { pontos }).then(ranking);
-
-  loginBox.addEventListener("keydown", (e) => e.stopPropagation());
-  loginBox.querySelector("form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const f = e.target, erro = document.getElementById("login-erro");
-    f.querySelector("button").disabled = true;
-    erro.textContent = "";
-    try {
-      const res = await api("/api/login", { usuario: f.usuario.value, senha: f.senha.value });
-      const r = await res.json();
-      if (!res.ok) throw new Error(r.erro);
-      localStorage.setItem("levi-token", r.token);
-      f.reset();
-      loginBox.hidden = true;
-      await ranking();
-      document.getElementById("bevy").focus();
-    } catch (err) {
-      erro.textContent = err.message || "Falha no login";
-    } finally {
-      f.querySelector("button").disabled = false;
-    }
-  });
-  ranking();
-</script>
-<script>
-  // O navegador cria o AudioContext suspenso; o primeiro gesto do jogador libera o som.
-  (() => {
-    const ctxs = [];
-    const Orig = window.AudioContext || window.webkitAudioContext;
-    if (!Orig) return;
-    window.AudioContext = class extends Orig { constructor(...a) { super(...a); ctxs.push(this); } };
-    const resume = () => ctxs.forEach((c) => c.state !== "running" && c.state !== "closed" && c.resume().catch(() => {}));
-    ["pointerdown", "keydown", "touchend"].forEach((e) => addEventListener(e, resume, { capture: true }));
-  })();
-</script>
-<script type="module">
-  import init from "./levi-runner.js";
-  init().catch((e) => { if (!String(e).includes("Using exceptions for control flow")) throw e; });
-  document.getElementById("bevy").focus();
-  setTimeout(() => document.getElementById("loading").remove(), 4000);
-</script>
+<script type="module" src="/src/main.js"></script>
 </body>
 </html>

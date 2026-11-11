@@ -49,7 +49,6 @@ def check_or_create(login, password):
 
 
 class Handler(SimpleHTTPRequestHandler):
-    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".wasm": "application/wasm"}
     gz = False
 
     def translate_path(self, path):

@@ -1,0 +1,119 @@
+/* HUD de runner de desenho animado: placas escuras com números grossos no canto, botões azuis
+   gordinhos, selo do título sobre bolhas azuis e "toque para jogar" pulsando. */
+
+@font-face {
+  /* Fira Sans Bold só com Latin-1, travessão e setas */
+  font-family: "Fira Sans Game";
+  src: url("/fonts/FiraSans-Bold-subset.ttf") format("truetype");
+  font-weight: 700;
+  font-display: block;
+}
+
+:root {
+  --gold: rgb(255 209 38);
+  --title: rgb(255 219 31);
+  --navy: rgb(8 26 64);
+  --coral: rgb(242 89 77);
+  --font: "Fira Sans Game", system-ui, sans-serif;
+}
+
+html, body { margin: 0; height: 100%; background: #87c7f2; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+#game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+[hidden] { display: none !important; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; font: 700 16px var(--font); color: #fff; }
+#hud button { pointer-events: auto; cursor: pointer; font: inherit; color: inherit; }
+#hud p, #hud h1, #hud h2 { margin: 0; }
+
+/* botão azul de borda branca com "degrau" embaixo (sombra dura deslocada) */
+.blue-button {
+  background: linear-gradient(rgb(77 166 255), rgb(15 89 217));
+  border: 3px solid #fff;
+  box-shadow: 0 5px 0 rgb(5 38 102);
+  transition: transform .08s, box-shadow .08s;
+}
+.blue-button:active { transform: translateY(3px); box-shadow: 0 2px 0 rgb(5 38 102); }
+
+/* placa escura translúcida dos números */
+.plate {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 14px; border-radius: 12px;
+  background: rgb(5 15 36 / .72);
+  border-top: 2px solid rgb(255 255 255 / .25); border-bottom: 2px solid rgb(0 0 0 / .4);
+}
+
+#pause {
+  position: absolute; top: 14px; left: 14px; width: 54px; height: 54px; border-radius: 14px;
+  display: flex; justify-content: center; align-items: center; gap: 7px; padding: 0;
+}
+#pause i { width: 7px; height: 22px; border-radius: 2px; background: #fff; }
+
+.stats { position: absolute; top: 14px; right: 14px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.score { font-size: 38px; text-shadow: 0 3px 0 var(--navy); font-variant-numeric: tabular-nums; }
+.coins { font-size: 30px; color: var(--gold); text-shadow: 0 3px 0 var(--navy); display: inline-block; transform-origin: right center; }
+.coin-icon {
+  width: 26px; height: 26px; box-sizing: border-box; border-radius: 50%;
+  background: linear-gradient(rgb(255 237 128), rgb(242 153 13)); border: 3px solid rgb(204 122 0);
+}
+
+.menu {
+  position: absolute; inset: 0; box-sizing: border-box; padding: max(5vh, 76px) 0 16vh;
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+}
+.badge { display: flex; flex-direction: column; align-items: center; width: 460px; max-width: 94%; transform: rotate(-4deg); }
+.bubbles { position: relative; width: 100%; aspect-ratio: 2.1; display: grid; place-items: center; }
+.bubbles b {
+  position: absolute; aspect-ratio: 1; box-sizing: border-box; border-radius: 50%; border: 4px solid;
+  background: linear-gradient(rgb(82 173 255), rgb(20 77 209));
+  border-color: rgb(191 235 255) rgb(13 56 153) rgb(8 38 115) rgb(128 204 255);
+}
+#title {
+  position: relative; font-size: clamp(44px, 16vw, 74px); line-height: 1; text-align: center; white-space: pre-line;
+  color: var(--title); text-shadow: 0 6px 0 var(--navy);
+}
+.banner {
+  position: relative; margin-top: -6px !important; padding: 4px 18px; border-radius: 20px;
+  background: var(--coral); box-shadow: 0 4px 0 var(--navy); font-size: 20px; text-align: center;
+}
+.cta { font-size: clamp(22px, 7vw, 34px); text-shadow: 0 4px 0 var(--navy); text-align: center; }
+
+.paused {
+  position: absolute; inset: 0; background: rgb(0 8 26 / .4);
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px;
+}
+.paused h2 { font-size: 72px; color: var(--title); text-shadow: 0 6px 0 var(--navy); }
+.paused p { font-size: 22px; text-shadow: 0 3px 0 var(--navy); }
+
+#sound { position: absolute; bottom: 18px; right: 16px; padding: 10px 18px; border-radius: 16px; font-size: 20px; text-shadow: 0 2px 0 var(--navy); }
+.hint { position: absolute; bottom: 18px; left: 16px; max-width: 55%; font-size: 15px; color: rgb(255 255 255 / .92); white-space: pre-line; display: block; }
+@media (max-width: 600px) {
+  #sound { font-size: 15px; padding: 8px 12px; }
+  .hint { font-size: 12px; max-width: calc(100% - 190px); }
+}
+
+.zone {
+  position: absolute; top: 22%; width: 100%; text-align: center; font-size: 52px;
+  color: rgb(255 242 204); text-shadow: 0 4px 0 rgb(0 13 31 / .5); opacity: 0;
+}
+
+/* ---------- carregamento, login e ranking ---------- */
+
+#loading { position: fixed; inset: 0; display: grid; place-items: center; font: 600 22px system-ui, sans-serif; color: #fff; text-shadow: 0 2px 4px #0006; pointer-events: none; }
+
+/* mesmo estilo do HUD: placas escuras, títulos amarelos, botões gordinhos com degrau */
+#login { position: fixed; inset: 0; display: grid; place-items: center; background: #04122acc; z-index: 2; font: 700 16px system-ui, sans-serif; }
+#login form { display: grid; gap: 12px; width: min(340px, calc(100vw - 32px)); padding: 26px 24px 22px; border-radius: 24px; background: linear-gradient(#4da8ff, #0f58d8); border: 4px solid #fff; box-shadow: 0 8px 0 #06266b, 0 20px 40px #0007; transform: rotate(-1.5deg); }
+#login h1 { margin: 0 0 4px; font: 700 40px var(--font); line-height: 1; text-align: center; color: #ffdb1f; text-shadow: 0 5px 0 #08193f; letter-spacing: .02em; }
+#login input { font: inherit; padding: 12px 14px; border-radius: 14px; border: 3px solid #0b3c99; background: #fff; color: #08193f; }
+#login button { font: 800 20px system-ui, sans-serif; padding: 12px; border-radius: 16px; border: 3px solid #fff; background: linear-gradient(#ffe066, #ffab0a); color: #08193f; box-shadow: 0 6px 0 #a35f00; cursor: pointer; transition: transform .08s, box-shadow .08s; }
+#login button:active { transform: translateY(4px); box-shadow: 0 2px 0 #a35f00; }
+#login button:disabled { opacity: .6; cursor: wait; }
+#login-erro { min-height: 1.2em; margin: 0; color: #ffe1e1; font-size: 13px; }
+
+#ranking { position: fixed; top: 82px; left: 14px; width: 230px; padding: 10px 14px 12px; border-radius: 14px; background: #020a1ab8; border-top: 2px solid #ffffff40; color: #fff; font: 700 15px system-ui, sans-serif; pointer-events: none; }
+#ranking h2 { margin: 0 0 6px; font-size: 16px; letter-spacing: .08em; color: #ffdb1f; text-shadow: 0 2px 0 #08193f; }
+#ranking ol { margin: 0; padding-left: 22px; }
+#ranking li { display: flex; gap: 8px; }
+#ranking li span:first-child { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#ranking li.eu { color: #ffdb1f; }
+#ranking p { margin: 6px 0 0; font-size: 13px; opacity: .85; }

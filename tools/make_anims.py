@@ -7,7 +7,7 @@ Convenção do rig (Blender → glTF): coxa/canela/braço têm eixo X local ≈ 
 então ângulo X positivo = membro para frente; joelho dobra com X negativo; spine/chest X positivo = inclina p/ frente.
 "_hips_y" é a altura desejada do quadril; sample() ainda levanta o corpo se algo (cabeção incluso) entrar no chão.
 "_lift" soma altura depois dessa correção (quique); "_spin" gira o corpo para frente em torno do próprio centro.
-Jump e Roll são "scrubbed" pelo jogo (player.rs): o tempo do clipe vem da física, não do relógio.
+Jump e Roll são "scrubbed" pelo jogo (src/player.js): o tempo do clipe vem da física, não do relógio.
 """
 import json, struct, sys
 import numpy as np

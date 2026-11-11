@@ -1,9 +1,8 @@
 #!/bin/sh
-# Gera dist/ pronto para servir. Uso: ./build.sh
+# Gera dist/ pronto para servir com o server.py. Uso: ./build.sh
 set -e
-cargo build --release --target wasm32-unknown-unknown
-wasm-bindgen --target web --no-typescript --out-dir dist target/wasm32-unknown-unknown/release/levi-runner.wasm
-cp index.html dist/
-cp -r assets dist/
-# o server.py entrega estes .gz; a música fica de fora porque o gzip quase não a reduz
-gzip -9kf dist/levi-runner_bg.wasm dist/levi-runner.js dist/assets/levi.glb
+pnpm install --frozen-lockfile
+pnpm test
+pnpm build
+# o server.py entrega estes .gz; os sons ficam de fora porque o gzip quase não os reduz
+gzip -9kf dist/js/*.js dist/levi.glb

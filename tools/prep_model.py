@@ -1,4 +1,4 @@
-"""Converte levi.glb para algo que o loader glTF do Bevy aceita sem extensões:
+"""Converte levi.glb para um glb sem extensões de compressão (o jogo original em Bevy exigia):
 dequantiza atributos normalizados (KHR_mesh_quantization) e troca WebP por PNG.
 Uso: python3 tools/prep_model.py levi.glb assets/levi.glb
 """
