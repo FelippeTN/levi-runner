@@ -1,5 +1,5 @@
 {
-  "_leia": "Regras e preços do dinheiro do jogo, lidos pelo jogo e pelo server.py. Valores em centavos. O banco rende a Selic do Banco Central (o server.py busca); as taxas da corrida são de jogo.",
+  "_leia": "Regras e preços do dinheiro do jogo, lidos pelo jogo e pelo server.py. Valores em centavos. O banco rende a Selic do Banco Central (o server.py busca); as taxas da corrida são de jogo. Investimentos com taxas de mercado: pós-fixado (pctSelicInvestimento da Selic, como um CDB com carência que paga ~105% do CDI; carência em corridas), prefixado (taxa travada = Selic média esperada pelo Boletim Focus × pctSelicInvestimento + premioPrefixado, o prêmio de prazo, em p.p. ao ano; fica perto do que um CDB ou o Tesouro Prefixado de 1 ano pagam) e IPCA+ (IPCA do mês + jurosRealIpca % ao ano travado; a taxa real é parâmetro do jogo, de ordem parecida com a do Tesouro IPCA+).",
   "moeda": 1000,
   "imprevisto": 5000,
   "corrida": {
@@ -10,11 +10,16 @@
     "metrosParaMes": 200,
     "tetoPorMetro": 2000,
     "pctSelicCofrinho": 1,
-    "pctSelicInvestimento": 1.3,
+    "pctSelicInvestimento": 1.05,
     "selicReserva": 13.75,
     "ipcaReserva": 4.58,
     "reservaData": "11/11/2026",
-    "carencia": 6
+    "carencia": 6,
+    "prazoPrefixado": 12,
+    "premioPrefixado": 0.5,
+    "selicEsperadaReserva": 12.5,
+    "prazoIpca": 24,
+    "jurosRealIpca": 6
   },
   "skins": [
     { "id": "classico", "nome": "Levi Clássico", "tipo": "pintura", "preco": 0 },

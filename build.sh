@@ -7,4 +7,4 @@ pnpm build
 # o server.py entrega estes .gz; os sons ficam de fora porque o gzip quase não os reduz
 # o server.py lê regras e preços daqui quando roda só com o dist/
 cp src/edu/catalog.json dist/
-gzip -9kf dist/js/*.js dist/levi.glb
+gzip -9kf dist/js/*.js dist/levi.glb dist/scenery.glb dist/sky.hdr

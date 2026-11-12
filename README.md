@@ -6,8 +6,18 @@ skins paga com esse dinheiro.
 
 O cofrinho rende a **Selic real**: o `server.py` busca a Selic meta e o IPCA de 12 meses na API do Banco Central
 (`api.bcb.gov.br`, séries 432 e 13522) uma vez a cada 24 h, e cada corrida de 200 m ou mais vale um mês dessa taxa.
-O investimento travado paga 130% dela. Sem saída HTTPS para o Banco Central, vale a última taxa gravada ou a reserva
-do `catalog.json` (`selicReserva`, `ipcaReserva`), e a tela mostra "Selic de referência".
+Há três tipos de investimento, para ensinar a diferença entre eles:
+
+| Tipo | Rende | Prazo | Antes do prazo |
+|---|---|---|---|
+| Pós-fixado | 105% da Selic de cada mês, como um CDB com carência | 6 corridas (carência) | não resgata |
+| Prefixado | taxa travada na aplicação: Selic média esperada pelo **Boletim Focus** (`olinda.bcb.gov.br`) × 105% + prêmio de prazo de 0,5 p.p. | 12 corridas | vende a preço de mercado |
+| IPCA+ | IPCA do mês + juro real travado (`jurosRealIpca`) | 24 corridas | vende a preço de mercado |
+
+A venda antecipada usa marcação a mercado (juros subiram, o título vale menos; caíram, vale mais). O painel tem um
+simulador "e se a Selic cair/subir 3 p.p." e o guia "Aprenda". Sem saída HTTPS para o Banco Central, vale a última
+taxa gravada ou a reserva do `catalog.json` (`selicReserva`, `ipcaReserva`, `selicEsperadaReserva`), e a tela mostra
+"Selic de referência".
 
 ## Rodar
 
@@ -21,6 +31,19 @@ pnpm test              # física, colisão, economia, malhas, sombra (node) e re
 
 Com `?stats` no endereço (ex.: `localhost:5173/?stats`) aparece um painel com FPS, draw calls, triângulos e a
 resolução atual, para conferir o desempenho em qualquer aparelho.
+
+## Assets
+
+Prédios, sobrados, carros, postes, palmeiras, árvores, nuvens, a luz do céu e a maior parte dos efeitos sonoros são
+pacotes **CC0** (domínio público) da KayKit, Quaternius, Kenney e Poly Haven. A lista com as fontes está em
+[`assets/CREDITS.md`](assets/CREDITS.md). Os arquivos prontos (`assets/scenery.glb`, `scenery.png`, `sky.hdr`,
+`sfx/*.wav`) estão no repositório; só é preciso refazê-los ao trocar ou incluir um modelo:
+
+```sh
+./tools/fetch_assets.sh          # baixa os originais em .cache/assets/ (fora do git)
+node tools/build_scenery.mjs     # junta os modelos em assets/scenery.glb (+ versão de longe) e reduz o céu
+./tools/build_sfx.sh             # converte os sons para assets/sfx/
+```
 
 ## Desempenho
 
@@ -40,10 +63,11 @@ resolução atual, para conferir o desempenho em qualquer aparelho.
 | `src/world/world.js` | Trechos reciclados, fileiras de obstáculos, rolagem e colisão |
 | `src/world/zones.js`, `props.js`, `backdrop.js` | Bairros, veículos/cavaletes/placas, fundo (Pão de Açúcar, Cristo) |
 | `src/world/textures.js`, `geometry.js`, `art.js` | Texturas e malhas geradas em código, materiais |
+| `src/world/models.js` | Modelos CC0 do `scenery.glb`: leitura, versão de longe, pintura dos sobrados |
 | `src/fx.js`, `src/render.js` | Câmera, sol com sombra estável, partículas, bloom e tone mapping |
 | `src/edu/catalog.json` | **Regras e preços** do dinheiro (moeda, % da Selic, juros da corrida, carência, skins), lidos pelo jogo e pelo servidor |
-| `src/edu/economy.js`, `bank.js` | Carteira da corrida, portais, juros, dívida; taxas em vigor, poupança e projeções do banco |
-| `src/edu/dicas.js` | Textos da "Dica do Levi" e do banco (para a equipe do PGE Educa revisar) |
+| `src/edu/economy.js`, `bank.js` | Carteira da corrida, juros, dívida; taxas em vigor, tipos de investimento, marcação a mercado, cenários e projeções do banco |
+| `src/edu/dicas.js` | Textos da "Dica do Levi", do banco e do guia de renda fixa (para a equipe do PGE Educa revisar) |
 | `src/skins.js` | Pinturas e acessórios do Levi |
 | `src/ui/` | HUD da corrida, menu e extrato, painéis do Banco e da Loja |
 | `src/account.js`, `src/api.js`, `src/ranking.js` | Conta no banco, cliente da API, login e ranking |

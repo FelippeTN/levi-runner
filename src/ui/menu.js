@@ -69,7 +69,7 @@ export class Menu {
   /**
    * Extrato da corrida que acabou; o depósito no banco chega depois (promessa do servidor).
    * @param {import("../game.js").Game} game
-   * @param {Promise<null | {deposito: number, mes: boolean, cofrinho: number, investimento: number, liberado: number}>} deposit
+   * @param {Promise<null | {deposito: number, mes: boolean, cofrinho: number, investimento: number, liberado: number, vencidos: {tipo: string, taxa_aa?: number}[]}>} deposit
    */
   statement(game, deposit) {
     const l = game.wallet.ledger;
@@ -90,6 +90,8 @@ export class Menu {
     deposit
       .then((r) => {
         if (!r) return;
+        // com a conta atualizada, a dica pode falar dos investimentos (o que venceu, a reserva, a diversificação)
+        $("tip").textContent = pickTip(l, { acc: this.account.data, resumo: r });
         const yieldText = r.cofrinho + r.investimento ? ` · seu dinheiro guardado rendeu +${brl(r.cofrinho + r.investimento)}` : "";
         dep.textContent = r.mes
           ? `+${brl(r.deposito)} na sua conta${yieldText}`

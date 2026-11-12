@@ -123,7 +123,7 @@ export function sea() {
 /**
  * Uma célula de fachada (um andar × um módulo); repete pela caixa via UV em metros.
  * A cor da parede vem do `color` do material (textura é clara).
- * @param {"modern" | "colonial" | "glass"} kind prédio de orla | sobrado com venezianas | torre de vidro
+ * @param {"modern" | "glass"} kind prédio de orla | torre de vidro
  */
 export function facade(kind) {
   return image(128, 128, (u, v) => {
@@ -135,30 +135,11 @@ export function facade(kind) {
       else if (v > 0.2 && v < 0.75 && u > 0.08 && u < 0.92) {
         c = Math.abs(u - 0.5) < 0.015 ? [0.9, 0.9, 0.9] : mix([0.25, 0.4, 0.55], [0.55, 0.7, 0.85], 1 - v);
       } else c = wall;
-    } else if (kind === "colonial") {
-      const win = u > 0.3 && u < 0.7 && v > 0.15 && v < 0.85;
-      const arch = ((u - 0.5) / 0.2) ** 2 + ((v - 0.25) / 0.1) ** 2 < 1 || v > 0.25;
-      if (win && arch) {
-        // veneziana verde
-        c = Math.abs(u - 0.5) < 0.012 || (fract(v * 10) < 0.12 && v > 0.3) ? [0.12, 0.35, 0.3] : [0.18, 0.45, 0.4];
-      } else if ((u > 0.26 && u < 0.74 && v > 0.11 && v < 0.89) || v > 0.93) {
-        c = [0.98, 0.98, 0.95]; // moldura e cornija brancas
-      } else c = wall;
     } else {
       const frame = u < 0.04 || v < 0.06;
       c = frame ? [0.55, 0.58, 0.62] : mix([0.3, 0.42, 0.55], [0.65, 0.78, 0.9], (u + (1 - v)) * 0.5);
     }
     return rgb([c[0] - n, c[1] - n, c[2] - n]);
-  });
-}
-
-/** Telhas cerâmicas (casarões de Santa Teresa). */
-export function roofTiles() {
-  return image(128, 128, (u, v) => {
-    const ripple = Math.abs(fract(u * 12) - 0.5) * 2;
-    const row = fract(v * 10) < 0.1 ? 1 : 0;
-    const base = mix([0.72, 0.32, 0.18], [0.85, 0.45, 0.25], hash(Math.floor(u * 12), Math.floor(v * 10)));
-    return rgb(scale(base, 1 - ripple * 0.25 - row * 0.3));
   });
 }
 

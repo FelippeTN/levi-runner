@@ -1,6 +1,7 @@
 // Malhas e materiais reaproveitados por todo o cenário (porte do `Art` original).
 
 import {
+  Box3,
   BoxGeometry,
   CapsuleGeometry,
   Color,
@@ -10,10 +11,12 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   SphereGeometry,
+  Vector3,
 } from "three";
 import { CAR_LEN, CAR_TOP, RAMP_LEN } from "../config.js";
 import { srgb } from "../util.js";
 import * as geo from "./geometry.js";
+import { readModels, tinted } from "./models.js";
 import * as tex from "./textures.js";
 
 /** Material com textura repetida `repeat` vezes por unidade de UV e cor multiplicando a textura. */
@@ -28,8 +31,12 @@ const solid = (color, roughness) => new MeshStandardMaterial({ color, roughness 
 const glow = (r, g, b) => new MeshStandardMaterial({ color: 0x000000, emissive: new Color(r, g, b) });
 
 export class Art {
-  constructor() {
-    const facade = { modern: tex.facade("modern"), colonial: tex.facade("colonial"), glass: tex.facade("glass") };
+  /**
+   * @param {{gltf: {scene: import("three").Object3D}, atlas: import("three").Texture}} scenery modelos CC0 do
+   *   assets/scenery.glb e o atlas de cores da KayKit (assets/scenery.png), ver `models.js`
+   */
+  constructor(scenery) {
+    const facade = { modern: tex.facade("modern"), glass: tex.facade("glass") };
     const [tCalc, tCob, tAsph, tSand, tSea] = [tex.calcadao(), tex.cobble(), tex.asphalt(), tex.sand(), tex.sea()];
 
     // ---------- geometria ----------
@@ -64,9 +71,7 @@ export class Art {
     // prédios: [geometria, tamanho] com UV em metros para a fachada repetir sem esticar
     const sizes = (list, cell) => list.map((s) => [geo.tiledBox(s, cell), s]);
     this.modern = sizes([[9, 21, 9], [8, 27, 9], [10, 33, 9], [9, 39, 9], [8, 15, 9]], [3, 3]);
-    this.colonial = sizes([[6.5, 7.5, 8], [6, 10.5, 8], [7, 9, 8]], [3, 3.6]);
     this.towers = sizes([[14, 45, 14], [12, 62, 12], [16, 35, 16]], [3, 3.5]);
-    this.roofs = [[6.5, 8], [8, 8], [9, 9]].map(([w, d]) => [geo.gable(w, 2.2, d), [w, 2.2, d]]);
 
     // peças arredondadas (cada proporção tem sua malha para o raio não esticar)
     const rb = (x, y, z, r) => {
@@ -96,7 +101,6 @@ export class Art {
     const pastel = [[0.98, 0.97, 0.94], [0.97, 0.9, 0.78], [0.82, 0.9, 0.96], [0.98, 0.86, 0.84], [0.93, 0.93, 0.86]];
     const vivid = [[0.98, 0.78, 0.25], [0.35, 0.62, 0.85], [0.95, 0.55, 0.6], [0.45, 0.75, 0.5], [0.98, 0.6, 0.3], [0.75, 0.55, 0.85]];
     this.mModern = pastel.map((c) => texMat(facade.modern, srgb(...c), [1, 1]));
-    this.mColonial = vivid.map((c) => texMat(facade.colonial, srgb(...c), [1, 1]));
     this.mGlass = texMat(facade.glass, srgb(1, 1, 1), [1, 1], { metalness: 0.6, roughness: 0.2 });
 
     const white = srgb(1, 1, 1);
@@ -114,10 +118,6 @@ export class Art {
     this.white = solid(srgb(0.96, 0.95, 0.92), 0.8);
     this.metal = new MeshStandardMaterial({ color: srgb(0.7, 0.72, 0.75), metalness: 0.9, roughness: 0.35 });
     this.dark = solid(srgb(0.12, 0.12, 0.13), 0.6);
-    this.trunk = solid(srgb(0.5, 0.37, 0.24), 0.95);
-    this.leaf = solid(srgb(0.38, 0.75, 0.18), 0.85);
-    this.canopy = solid(srgb(0.2, 0.55, 0.16), 0.9);
-    this.tileRoof = texMat(tex.roofTiles(), white, [1, 1]);
     this.lampGlow = glow(6, 4.5, 2);
     this.umbrellas = [[0.95, 0.2, 0.2], [0.1, 0.5, 0.9], [1, 0.8, 0.1], [0.1, 0.7, 0.4], [0.98, 0.5, 0.1]].map((c) => solid(srgb(...c), 0.7));
     this.barrier = texMat(tex.stripes([0.9, 0.1, 0.1], [0.97, 0.97, 0.97]), white, [1, 1]);
@@ -144,6 +144,43 @@ export class Art {
     /** LOD de longe: todas as peças de cor lisa num material só, cor por vértice (ver `Batch`) */
     this.palette = new MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
     this.blink = glow(8, 3, 0.3);
+
+    // ---------- modelos (KayKit e Quaternius, CC0) ----------
+    const atlas = new MeshStandardMaterial({ map: scenery.atlas, roughness: 0.75 });
+    /** @type {Map<string, import("./models.js").Model>} */
+    this.models = readModels(scenery.gltf, { atlas, vc: this.palette }, this.low);
+    const m = (name) => {
+      const model = this.models.get(name);
+      if (!model) throw new Error(`modelo ${name} não está no scenery.glb`);
+      return model;
+    };
+    this.palms = [1, 2, 3, 4].map((i) => m(`palmeira_${i}`));
+    /** direção para onde cada palmeira pende (ângulo em torno de y, a partir de +z), pelo meio da copa */
+    this.palmLean = this.palms.map(({ parts }) => {
+      const box = new Box3();
+      for (const { geometry } of parts) {
+        geometry.computeBoundingBox();
+        box.union(geometry.boundingBox);
+      }
+      const c = box.getCenter(new Vector3());
+      return Math.atan2(c.x, c.z);
+    });
+    this.trees = [1, 2, 3].map((i) => m(`arvore_${i}`));
+    this.bushes = [1, 2].map((i) => m(`arbusto_${i}`));
+    this.rocks = [1, 2].map((i) => m(`pedra_${i}`));
+    this.cars = ["hatchback", "sedan", "stationwagon", "taxi", "police"].map((c) => m(`carro_${c}`));
+    /** prédios de Copacabana, do mais baixo ao mais alto */
+    this.towersCity = ["A", "B", "E", "F", "C", "D", "G", "H"].map((l) => m(`predio_${l}`));
+    this.streetlight = m("poste");
+    this.bench = m("banco");
+    this.hydrant = m("hidrante");
+    this.trash = m("lixeira");
+    this.clouds = [1, 2, 3, 4, 5].map((i) => m(`nuvem_${i}`));
+    // sobrados pintados nas cores vivas da Lapa e de Santa Teresa: [modelo][cor]
+    const paints = vivid.map((c) => srgb(...c));
+    const painted = (names) => names.map((n) => paints.map((c) => tinted(m(n), c, this.low)));
+    this.sobrados = painted(["sobrado_varanda", "sobrado_colunas", "sobrado", "casarao_varanda", "sobrado_telhado"]);
+    this.casas = painted(["casa_telhado", "sobrado_telhado", "sobrado_varanda"]);
   }
 
   /** Ondas do mar deslizando. */

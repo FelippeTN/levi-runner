@@ -1,8 +1,9 @@
 // Levi Runner — endless runner de 3 faixas no Rio, com educação financeira (PGE Educa).
 
 import "./style.css";
-import { Group, Mesh, MeshBasicMaterial, PlaneGeometry, Scene } from "three";
+import { Group, Mesh, MeshBasicMaterial, PlaneGeometry, Scene, SRGBColorSpace, TextureLoader } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { Account } from "./account.js";
 import { Audio } from "./audio.js";
 import { MAX_DT } from "./config.js";
@@ -29,7 +30,19 @@ const events = new Events();
 const fx = new Fx(scene);
 const { renderer, composer, resize, adaptive } = createRenderer(canvas, scene, fx.camera);
 
-const art = new Art();
+const loader = new GLTFLoader();
+/** Cenário (modelos CC0 de assets/scenery.glb e o atlas de cores da KayKit); sem ele não há o que mostrar. */
+const scenery = await Promise.all([loader.loadAsync("/scenery.glb"), new TextureLoader().loadAsync("/scenery.png")]).catch((err) => {
+  document.getElementById("loading").textContent = "Não foi possível carregar o cenário.";
+  throw err;
+});
+const [sceneryGltf, atlas] = scenery;
+// textura de glTF: sem inverter o v, em sRGB
+atlas.flipY = false;
+atlas.colorSpace = SRGBColorSpace;
+const art = new Art({ gltf: sceneryGltf, atlas });
+// luz do céu: se não carregar, fica o céu uniforme
+new HDRLoader().loadAsync("/sky.hdr").then((sky) => fx.setSky(sky), (err) => console.warn("céu não carregou", err));
 scene.add(backdrop(art));
 const scrolling = new Group();
 scene.add(scrolling);
@@ -45,7 +58,7 @@ const account = new Account();
 /** Veste o que a conta tem equipado (fora do provador da loja). */
 const wearEquipped = () => player.wear?.(account.data?.pintura ?? "classico", account.data?.acessorio ?? null);
 
-new GLTFLoader().load(
+loader.load(
   "/levi.glb",
   (gltf) => {
     player.attachModel(gltf);

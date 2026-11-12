@@ -1,9 +1,9 @@
 // Montagem de um trecho (20 m) de cada bairro do Rio. A ordem das chamadas ao gerador é a mesma do
 // original: a mesma semente monta o mesmo cenário.
 
-import { Vector3 } from "three";
 import { LANES, TILE_LEN } from "../config.js";
 import { qx, qy, qz, tf } from "../util.js";
+import { addModel, fitHeight } from "./models.js";
 
 const HALF_PI = Math.PI / 2;
 
@@ -18,38 +18,48 @@ function rails(b, art) {
   }
 }
 
+/** Gira o modelo (frente para +z) para olhar para a pista a partir do lado de `x`. */
+const facing = (x) => qy(-Math.sign(x) * HALF_PI);
+
+/** Escolha fixa pela posição, para variar o modelo sem gastar sorteio do gerador (a semente monta o mesmo cenário). */
+const variant = (x, z, n) => Math.abs(Math.floor(x * 7.31 + z * 3.17)) % n;
+
+/** Altura do poste (m) e ponta do braço no modelo da KayKit, em relação ao pé (o braço sai para -x). */
+const LAMP_H = 5;
+const LAMP_TIP = [-0.24, 0.95];
+
 function lamp(b, art, x, z) {
-  const s = -Math.sign(x);
-  b.add(art.cylinder, art.dark, tf(x, 2.5, z, undefined, [0.08, 5, 0.08]));
-  b.add(art.cylinder, art.dark, tf(x + s * 0.5, 5, z, qz(HALF_PI), [0.06, 1.1, 0.06]));
-  b.add(art.sphere, art.dark, tf(x + s, 4.98, z, undefined, [0.3, 0.12, 0.22]));
-  b.add(art.sphere, art.lampGlow, tf(x + s, 4.9, z, undefined, [0.24, 0.08, 0.17]));
+  const s = -Math.sign(x); // lado da pista
+  const k = fitHeight(art.streetlight, LAMP_H);
+  addModel(b, art.streetlight, tf(x, 0, z, s < 0 ? undefined : qy(Math.PI), k));
+  // lâmpada acesa sob a ponta do braço (o bloom faz o resto)
+  b.add(art.sphere, art.lampGlow, tf(x - s * LAMP_TIP[0] * k, LAMP_TIP[1] * k - 0.12, z, undefined, [0.22, 0.07, 0.16]));
 }
 
 function palm(b, art, x, z, g) {
   const h = 5.5 + (g.rand() % 20) * 0.1;
   const lean = ((g.rand() % 100) / 100 - 0.5) * 0.25;
-  b.add(art.cylinder, art.trunk, tf(x - (lean * h) / 2, h / 2, z, qz(lean), [0.17, h, 0.17]));
-  const top = new Vector3(x - lean * h, h, z);
-  for (let i = 0; i < 7; i++) {
-    const r = qy((i * Math.PI * 2) / 7 + lean).multiply(qx(0.45));
-    const p = new Vector3(0, 0, 1.3).applyQuaternion(r).add(top);
-    b.add(art.sphere, art.leaf, tf(p.x, p.y, p.z, r, [0.35, 0.06, 1.5]));
-  }
-  b.add(art.sphere, art.trunk, tf(top.x, top.y, top.z, undefined, 0.3));
+  const i = variant(x, z, art.palms.length);
+  const model = art.palms[i];
+  // a copa pende para o lado oposto da pista (praia, à esquerda), com um pouco de variação
+  const away = Math.sign(x) * HALF_PI;
+  addModel(b, model, tf(x, 0, z, qy(away - art.palmLean[i] + lean * 4), fitHeight(model, h)));
 }
 
 function tree(b, art, x, y, z, s) {
-  b.add(art.cylinder, art.trunk, tf(x, y + 1.5 * s, z, undefined, [0.22 * s, 3 * s, 0.22 * s]));
-  for (const [dx, dy, r] of [[0, 3.8, 1.8], [0.9, 3.2, 1.3], [-0.8, 3.4, 1.4]]) {
-    b.add(art.sphere, art.canopy, tf(x + dx * s, y + dy * s, z, undefined, r * s));
-  }
-  // copa de cima mais clara: árvore em dois tons
-  b.add(art.sphere, art.leaf, tf(x + 0.2 * s, y + 4.9 * s, z, undefined, 1.1 * s));
+  const model = art.trees[variant(x, z, art.trees.length)];
+  addModel(b, model, tf(x, y, z, qy(x + z), fitHeight(model, 6 * s)));
 }
 
-/** Prédio sobre o chão em `baseY`, frente voltada para a pista. */
-function building(b, [geometry, size], mat, x, baseY, z) {
+/** Prédio (modelo) sobre o chão em `baseY`, frente voltada para a pista, com `width` m de fachada. */
+function building(b, model, x, baseY, z, width) {
+  const k = width / model.size[0];
+  const depth = model.size[2] * k;
+  addModel(b, model, tf(x + (Math.sign(x) * depth) / 2, baseY, z, facing(x), k));
+}
+
+/** Prédio de caixa com a fachada na textura (torres de vidro ao fundo da Lapa). */
+function block(b, [geometry, size], mat, x, baseY, z) {
   b.add(geometry, mat, tf(x + (Math.sign(x) * size[0]) / 2, baseY + size[1] / 2, z, qy(HALF_PI)));
 }
 
@@ -89,10 +99,18 @@ function copacabana(b, art, serial, g) {
   }
   lamp(b, art, 5.4, 0);
   lamp(b, art, 16, 10);
+  // carro estacionado na Avenida Atlântica e mobiliário do calçadão
+  const car = art.cars[serial % art.cars.length];
+  addModel(b, car, tf(15.4, 0, -4 + (serial % 3) * 3, undefined, 4.4 / car.size[2]));
+  addModel(b, art.bench, tf(18.8, 0, 4, qy(-HALF_PI), 4.5));
+  if (serial % 2 === 0) addModel(b, art.trash, tf(17.2, 0, -7, undefined, 5));
   for (let i = 0; i < 2; i++) {
-    const size = art.modern[g.pick(art.modern.length)];
-    building(b, size, art.mModern[g.pick(art.mModern.length)], 20.5, 0, -5 + i * 10);
+    const model = art.towersCity[g.pick(art.towersCity.length)];
+    g.pick(art.mModern.length); // a cor vem do atlas do modelo; o sorteio fica para a semente montar o mesmo trecho
+    building(b, model, 20.5, 0, -5 + i * 10, 10);
   }
+  // paredão de prédios altos do bairro, atrás da primeira fileira (sem sorteio: vem do número do trecho)
+  block(b, art.modern[serial % art.modern.length], art.mModern[(serial * 3) % art.mModern.length], 33, 0, 0);
 }
 
 /** Arcos da Lapa atravessando a pista: dois andares de arcos brancos e o bondinho no alto. */
@@ -113,16 +131,12 @@ function lapa(b, art, serial, gate, g) {
     ground(b, art, art.cobbleLight, s < 0 ? -8 : 4.5, s < 0 ? -4.5 : 8, 0.02);
     ground(b, art, art.asphalt, s < 0 ? -60 : 8, s < 0 ? -8 : 60, -0.02);
     lamp(b, art, s * 5.4, 5);
+    // sobrados coloridos colados um no outro (modelo e cor sorteados)
     for (let i = 0; i < 3; i++) {
-      const size = art.colonial[g.pick(art.colonial.length)];
-      const mat = art.mColonial[g.pick(art.mColonial.length)];
-      const z = -6.7 + i * 6.7;
-      building(b, size, mat, s * 8, 0, z);
-      // cornija
-      const [w, h] = size[1];
-      b.add(art.cube, art.white, tf(s * (8 + w / 2) - s * 0.15, h + 0.2, z, undefined, [w + 0.4, 0.4, 6.8]));
+      const kind = art.sobrados[g.pick(art.sobrados.length)];
+      building(b, kind[g.pick(kind.length)], s * 8, 0, -6.7 + i * 6.7, 6.7);
     }
-    if (serial % 2 === 0) building(b, art.towers[g.pick(art.towers.length)], art.mGlass, s * 28, 0, 0);
+    if (serial % 2 === 0) block(b, art.towers[g.pick(art.towers.length)], art.mGlass, s * 28, 0, 0);
   }
   if (gate || serial % 4 === 0) arcos(b, art);
 }
@@ -138,16 +152,16 @@ function santaTeresa(b, art, serial, g) {
     const w = 40;
     b.add(art.plane, art.grass, tf(s * (5.4 + (w / 2) * Math.cos(slope)), (w / 2) * Math.sin(slope), 0, qz(s * slope), [w, 1, TILE_LEN]));
     lamp(b, art, s * 5, s < 0 ? -4 : 6);
-    // casarão com telhado de telha
+    // casarão com telhado (o pé afunda na encosta, para não sobrar fresta do lado de baixo)
     const x = s * (11 + (g.rand() % 30) * 0.1);
     const z = -4 + (g.rand() % 80) * 0.1;
-    const [roofGeo, roofSize] = art.roofs[g.pick(art.roofs.length)];
-    const body = art.colonial[(serial + (s > 0 ? 1 : 0)) % art.colonial.length];
-    const mat = art.mColonial[g.pick(art.mColonial.length)];
-    const base = hy(x) - 0.5;
-    building(b, body, mat, x, base, z);
-    const [bw, bh] = body[1];
-    b.add(roofGeo, art.tileRoof, tf(x + (s * bw) / 2, base + bh, z, undefined, [bw / roofSize[0], 1, 1]));
+    g.rand(); // sorteava o telhado, que agora vem no modelo; fica para a semente montar o mesmo trecho
+    const kind = art.casas[(serial + (s > 0 ? 1 : 0)) % art.casas.length];
+    building(b, kind[g.pick(kind.length)], x, hy(x) - 1, z, 6.8);
+    // arbusto e pedra na encosta
+    const bx = s * 9, bz = z + (z > 0 ? -5 : 5);
+    addModel(b, art.bushes[serial % 2], tf(bx, hy(bx) - 0.2, bz, qy(bz), 1.6));
+    addModel(b, art.rocks[(serial + 1) % 2], tf(s * 6.4, hy(s * 6.4) - 0.1, -bz, qy(bz), 1.4));
     for (let i = 0; i < 3; i++) {
       const tx = s * (7 + (g.rand() % 220) * 0.1);
       const tz = (g.rand() % 200) * 0.1 - 10;

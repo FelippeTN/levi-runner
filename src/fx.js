@@ -57,6 +57,9 @@ export function shadowFrame(scrolled) {
   return { center, diameter, depth: max.z - min.z, texel };
 }
 
+/** Força da luz do céu da Poly Haven (o céu uniforme de reserva usa 1,3). */
+const SKY_INTENSITY = 1.6;
+
 // reaproveitados pela câmera a cada quadro (sem lixo para o coletor)
 const _eye = new Vector3(), _look = new Vector3(), _to = new Vector3();
 
@@ -97,6 +100,17 @@ export class Fx {
     this.cube = new BoxGeometry(1, 1, 1);
     const unlit = (r, g, b) => new MeshBasicMaterial({ color: srgb(r, g, b) });
     this.mats = { dust: unlit(0.85, 0.8, 0.7), gold: unlit(1, 0.9, 0.3), debris: [unlit(0.98, 0.78, 0.1), unlit(0.95, 0.45, 0.1), unlit(0.9, 0.9, 0.9)] };
+  }
+
+  /**
+   * Troca o céu uniforme pelo céu de verdade (assets/sky.hdr, da Poly Haven): luz ambiente mais clara em cima
+   * que no horizonte, e reflexos com nuvens.
+   * @param {import("three").DataTexture} sky
+   */
+  setSky(sky) {
+    sky.mapping = EquirectangularReflectionMapping;
+    this.scene.environment = sky;
+    this.scene.environmentIntensity = SKY_INTENSITY;
   }
 
   #placeSun(scrolled) {

@@ -67,9 +67,9 @@ export class Batch {
   }
 }
 
-/** Só cor: sem textura, sem brilho próprio e opaco (o resto mantém o material dele). */
+/** Só cor: sem textura, sem brilho próprio e opaco (o resto mantém o material dele). A paleta já tem cor por vértice. */
 function plain(m) {
-  return m.isMeshStandardMaterial && !m.map && !m.transparent && m.emissive.getHex() === 0 && m.fog;
+  return m.isMeshStandardMaterial && !m.map && !m.vertexColors && !m.transparent && m.emissive.getHex() === 0 && m.fog;
 }
 
 /** Remove os filhos de `group` liberando a geometria mesclada (que só eles usam). */

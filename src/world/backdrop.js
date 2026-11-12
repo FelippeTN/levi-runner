@@ -58,15 +58,13 @@ export function backdrop(art) {
   b.add(box, statue, tf(tx, ty + 21 * s, tz, undefined, [24 * s, 2.2 * s, 2.2 * s]), false);
   b.add(sphere, statue, tf(tx, ty + 24.5 * s, tz, undefined, 1.8 * s), false);
 
-  // nuvens
-  const cloud = far(srgb(1, 0.98, 0.96), true);
-  // nuvem é borrão sem luz: só o contorno conta, e com menos da metade dos triângulos do morro
-  const puff = new SphereGeometry(1, 20, 10);
+  // nuvens low-poly (Quaternius): com luz, para as facetas aparecerem; brilho próprio para não ficarem cinza
+  const cloud = new MeshStandardMaterial({ vertexColors: true, roughness: 1, emissive: srgb(0.55, 0.6, 0.68), fog: false });
   for (let i = 0; i < 9; i++) {
     const [x, y, z] = [-600 + i * 150, 170 + (i % 3) * 40, -700 + (i % 2) * 120];
-    for (const [dx, dy, r] of [[0, 0, 34], [30, -6, 24], [-32, -8, 26], [12, 10, 22]]) {
-      b.add(puff, cloud, tf(x + dx, y + dy, z, undefined, [r * 1.6, r * 0.6, r]), false);
-    }
+    const model = art.clouds[i % art.clouds.length];
+    const k = 110 / model.size[0] + (i % 3) * 4;
+    for (const { geometry } of model.parts) b.add(geometry, cloud, tf(x, y, z, undefined, [k, k * 0.8, k]), false);
   }
 
   const group = b.build();

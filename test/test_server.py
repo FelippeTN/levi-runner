@@ -86,30 +86,124 @@ class Banco(unittest.TestCase):
     def test_carregar_e_salvar(self):
         acc = server.carregar("teste")
         acc["conta"] = 123
-        acc["aplicacoes"].append({"valor": 1, "libera_em": 6})
+        acc["aplicacoes"].append({"id": 1, "tipo": "pre", "valor": 1, "aplicado": 1, "taxa": 0.01, "taxa_aa": 12.7, "libera_em": 6})
         server.salvar("teste", acc)
         self.assertEqual(server.carregar("teste"), acc)
 
     def test_taxas_seguem_a_selic_e_caem_para_a_reserva(self):
-        def falha(serie):
+        def falha():
             raise OSError("sem rede")
 
-        server.atualizar_taxas(falha)
+        server.atualizar_taxas({nome: falha for nome in server.FONTES})
         t = server.taxas()
         self.assertEqual((t["selic"], t["ao_vivo"], t["consultado"]), (B["selicReserva"], False, B["reservaData"]))
+        self.assertEqual(t["selic_esperada"], B["selicEsperadaReserva"])
         # 12 meses compostos da taxa mensal devolvem a taxa do ano
         self.assertAlmostEqual((1 + server.mensal(13.75)) ** 12, 1.1375)
+        self.assertAlmostEqual(server.anual(server.mensal(13.75)), 13.75)
 
-        server.atualizar_taxas(lambda serie: {432: 10.0, 13522: 4.0}[serie])
+        server.atualizar_taxas({"selic": lambda: 10.0, "ipca": lambda: 4.0, "selic_esperada": lambda: 9.0})
         t = server.taxas()
-        self.assertEqual((t["selic"], t["ipca"], t["ao_vivo"]), (10.0, 4.0, True))
+        self.assertEqual((t["selic"], t["ipca"], t["selic_esperada"], t["ao_vivo"]), (10.0, 4.0, 9.0, True))
         self.assertAlmostEqual(t["cofrinho"], server.mensal(10) * B["pctSelicCofrinho"])
         self.assertAlmostEqual(t["investimento"], server.mensal(10) * B["pctSelicInvestimento"])
+        # o pré embute a Selic esperada (9%), não a de hoje (10%)
+        self.assertAlmostEqual(t["prefixado_aa"], server.anual(server.mensal(9) * B["pctSelicInvestimento"]) + B["premioPrefixado"])
+        self.assertAlmostEqual(t["prefixado"], server.mensal(t["prefixado_aa"]))
+        self.assertAlmostEqual(t["ipca_mensal"], server.mensal(4))
 
         # resposta estranha do Banco Central não apaga o último valor bom
-        for ruim in (lambda s: 500.0, lambda s: float("x"), lambda s: [][0]):
-            server.atualizar_taxas(ruim)
+        for ruim in (lambda: 500.0, lambda: float("x"), lambda: [][0]):
+            server.atualizar_taxas({"selic": ruim})
         self.assertEqual(server.taxas()["selic"], 10.0)
+
+    def test_focus_usa_a_pesquisa_mais_recente_e_as_proximas_reunioes(self):
+        linha = lambda data, reuniao, mediana: {"Data": data, "Reuniao": reuniao, "Mediana": mediana}
+        linhas = [
+            linha("2026-11-06", "R2/2027", 12.0),
+            linha("2026-11-06", "R8/2026", 14.0),
+            linha("2026-11-06", "R1/2027", 13.0),
+            linha("2026-11-06", "R3/2027", 1.0),   # fora das 3 próximas
+            linha("2026-10-30", "R8/2026", 99.0),  # pesquisa antiga
+        ]
+        self.assertAlmostEqual(server.selic_esperada(linhas, reunioes=3), 13.0)
+
+
+TXI = {**TX, "prefixado": 0.02, "prefixado_aa": server.anual(0.02), "ipca_mensal": 0.004, "ipca_real": 0.005, "ipca_real_aa": 6.17}
+
+
+class Investimentos(unittest.TestCase):
+    def test_prefixado_rende_a_taxa_travada_mesmo_se_a_selic_mudar(self):
+        acc = conta(conta=100_000)
+        server.movimentar(acc, "investir", 100_000, "pre", tx=TXI)
+        ap = acc["aplicacoes"][0]
+        self.assertEqual((ap["tipo"], ap["taxa"], ap["libera_em"]), ("pre", 0.02, B["prazoPrefixado"]))
+        server.fim_de_corrida(acc, MES, 0, TXI)
+        server.fim_de_corrida(acc, MES, 0, {**TXI, "investimento": 0.5, "prefixado": 0.5})  # juros dispararam
+        esperado = 100_000
+        for _ in range(2):
+            esperado += server.render(esperado, 0.02)
+        self.assertEqual(ap["valor"], esperado)
+
+    def test_ipca_mais_soma_inflacao_do_mes_e_juro_real_travado(self):
+        acc = conta(conta=100_000)
+        server.movimentar(acc, "investir", 100_000, "ipca", tx=TXI)
+        server.fim_de_corrida(acc, MES, 0, {**TXI, "ipca_mensal": 0.01, "ipca_real": 0.9})
+        self.assertEqual(acc["aplicacoes"][0]["valor"], 100_000 + server.render(100_000, 1.01 * 1.005 - 1))
+        self.assertEqual(acc["aplicacoes"][0]["libera_em"], B["prazoIpca"])
+
+    def test_pos_fixado_e_o_padrao_e_aplicacao_antiga_vira_pos(self):
+        acc = conta(conta=100_000)
+        server.movimentar(acc, "investir", 50_000, tx=TXI)
+        self.assertEqual(acc["aplicacoes"][0]["tipo"], "pos")
+        with self.assertRaises(server.Recusado):
+            server.movimentar(acc, "investir", 1, "acoes", tx=TXI)
+
+        acc = server.carregar("antiga")
+        acc["aplicacoes"] = [{"valor": 7, "libera_em": 6}, {"valor": 8, "libera_em": 6}]
+        server.salvar("antiga", acc)
+        lido = server.carregar("antiga")["aplicacoes"]
+        self.assertEqual([(a["tipo"], a["id"], a["aplicado"]) for a in lido], [("pos", 1, 7), ("pos", 2, 8)])
+
+    def test_resgate_antecipado_a_preco_de_mercado(self):
+        def aplicado(tipo):
+            acc = conta(conta=100_000)
+            server.movimentar(acc, "investir", 100_000, tipo, tx=TXI)
+            server.fim_de_corrida(acc, MES, 0, TXI)
+            return acc
+
+        # taxa de hoje igual à contratada: sai pela curva
+        acc = aplicado("pre")
+        curva = acc["aplicacoes"][0]["valor"]
+        r = server.movimentar(acc, "resgatar", id=1, tx=TXI)
+        self.assertEqual((r["resgate"], r["na_curva"], acc["conta"], acc["aplicacoes"]), (curva, curva, curva, []))
+
+        # juros subiram depois da aplicação: vender antes do vencimento dá prejuízo
+        acc = aplicado("pre")
+        r = server.movimentar(acc, "resgatar", id=1, tx={**TXI, "prefixado": 0.03})
+        faltam = B["prazoPrefixado"] - 1
+        self.assertEqual(r["resgate"], round(r["na_curva"] * (1.02 / 1.03) ** faltam))
+        self.assertLess(r["resgate"], r["na_curva"])
+
+        # juros caíram: o título travado numa taxa maior vale mais
+        acc = aplicado("ipca")
+        r = server.movimentar(acc, "resgatar", id=1, tx={**TXI, "ipca_real": 0.003})
+        self.assertGreater(r["resgate"], r["na_curva"])
+
+    def test_resgate_recusado_no_pos_e_em_aplicacao_que_nao_existe(self):
+        acc = conta(conta=100_000)
+        server.movimentar(acc, "investir", 100_000, "pos", tx=TXI)
+        for id in (1, 2, None, "x"):
+            with self.assertRaises(server.Recusado):
+                server.movimentar(acc, "resgatar", id=id, tx=TXI)
+        self.assertEqual(len(acc["aplicacoes"]), 1)
+
+    def test_vencimento_entra_no_resumo(self):
+        acc = conta(conta=100_000)
+        server.movimentar(acc, "investir", 100_000, "pos", tx=TXI)
+        for _ in range(B["carencia"]):
+            r = server.fim_de_corrida(acc, MES, 0, TXI)
+        self.assertEqual([a["tipo"] for a in r["vencidos"]], ["pos"])
 
 
 if __name__ == "__main__":

@@ -26,7 +26,11 @@ export const store = {
 };
 
 export class Account extends EventTarget {
-  /** @type {null | {conta: number, cofrinho: number, aplicacoes: {valor: number, libera_em: number}[], mes: number, skins: string[], pintura: string, acessorio: string | null}} */
+  /**
+   * Aplicação: `tipo` pos | pre | ipca; `taxa` (fração ao mês) e `taxa_aa` (% ao ano) travadas no pré e no IPCA+ (juro real).
+   * @typedef {{id: number, tipo: "pos" | "pre" | "ipca", valor: number, aplicado: number, libera_em: number, taxa?: number, taxa_aa?: number}} Aplicacao
+   * @type {null | {conta: number, cofrinho: number, aplicacoes: Aplicacao[], mes: number, skins: string[], pintura: string, acessorio: string | null}}
+   */
   data = null;
   /** resumo da última corrida (depósito, rendimento do mês) para o banco comemorar */
   lastRun = null;
@@ -62,9 +66,11 @@ export class Account extends EventTarget {
     this.data = await api(path, body);
     setRates(this.data.taxas);
     this.#changed();
+    return this.data.resumo;
   }
-  bank(acao, valor) {
-    return this.#post("/api/banco", { acao, valor });
+  /** guardar, sacar, investir (`extra.tipo`) ou resgatar (`extra.id`); o resgate devolve {resgate, na_curva}. */
+  bank(acao, valor, extra = {}) {
+    return this.#post("/api/banco", { acao, valor, ...extra });
   }
   buy(skin) {
     return this.#post("/api/loja", { skin });

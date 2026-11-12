@@ -4,3 +4,4 @@ dist/
 ranking.db
 levi-runner-local.zip
 __pycache__/
+.cache/

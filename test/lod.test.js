@@ -8,8 +8,9 @@ import { Adaptive } from "../src/render.js";
 import { Art } from "../src/world/art.js";
 import { Coins, Props } from "../src/world/props.js";
 import { World } from "../src/world/world.js";
+import { loadScenery } from "./scenery.js";
 
-const art = new Art();
+const art = new Art(await loadScenery());
 
 const tris = (g) => (g.index ? g.index.count : g.attributes.position.count) / 3;
 
@@ -103,4 +104,21 @@ test("resolução cai quando o quadro pesa, volta quando folga e não fica oscil
   assert.equal(a.ratio, 0.75);
   run(500, 2); // aba em segundo plano não conta
   assert.equal(a.ratio, 0.75);
+});
+
+test("modelos CC0 do scenery.glb: versão de longe mais leve (ou some, se é miúdo); a pintura do sobrado só muda a parede", () => {
+  for (const [name, { parts }] of art.models) {
+    for (const { geometry } of parts) {
+      assert.ok(art.low.has(geometry), `${name} fora do LOD`);
+      const far = art.low.get(geometry);
+      // sem versão de longe só peça pequena, que some de longe
+      if (!far) assert.ok(tris(geometry) < 300, `${name} (${tris(geometry)} triângulos) sumiria de longe`);
+      else assert.ok(tris(far) < tris(geometry) * 0.6, `${name}: ${tris(far)} de ${tris(geometry)}`);
+    }
+  }
+  // mesmo sobrado em duas cores: mesma malha, só parte das cores muda
+  const [a, b] = art.sobrados[0].slice(0, 2).map((m) => m.parts[0].geometry.attributes.color.array);
+  let changed = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) changed++;
+  assert.ok(changed > 0 && changed < a.length * 0.8, `${changed} de ${a.length}`);
 });

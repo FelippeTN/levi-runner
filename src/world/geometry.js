@@ -228,22 +228,6 @@ export function ramp(w, h, len) {
   return b.build();
 }
 
-/** Telhado de duas águas (prisma) sobre uma caixa `w`×`d`, cumeeira ao longo de z. */
-export function gable(w, h, d) {
-  const hw = w / 2 + 0.3, hd = d / 2 + 0.3;
-  const b = new Builder();
-  for (const s of [-1, 1]) {
-    const q = [b.vert(s * hw, 0, hd, 0, 0), b.vert(s * hw, 0, -hd, d / 2, 0), b.vert(0, h, -hd, d / 2, hw / 2), b.vert(0, h, hd, 0, hw / 2)];
-    if (s > 0) b.quad(q[0], q[1], q[2], q[3]);
-    else b.quad(q[0], q[3], q[2], q[1]);
-  }
-  for (const z of [-hd, hd]) {
-    const t = [b.vert(-hw, 0, z, 0, 0), b.vert(hw, 0, z, 1, 0), b.vert(0, h, z, 0, 1)];
-    b.idx.push(...(z > 0 ? t : [t[0], t[2], t[1]]));
-  }
-  return b.build();
-}
-
 /** Cúpula do céu com degradê por vértice (horizonte quente → zênite azul); cores em `Color` (linear). */
 export function skyDome(radius, horizon, mid, zenith) {
   const g = new SphereGeometry(radius, 48, 24);

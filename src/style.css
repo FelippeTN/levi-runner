@@ -230,7 +230,7 @@ body.panel-open .menu { visibility: hidden; }
 }
 
 /* blocos internos: placas escuras com o mesmo contorno */
-.yield, .selic, .acc, .move, .projection, .card, .detail { border: 3px solid var(--ink); }
+.yield, .selic, .acc, .move, .projection, .card, .detail, .guia { border: 3px solid var(--ink); }
 .selic { padding: 8px 12px; border-radius: 16px; background: rgb(10 20 46 / .5); font-size: 13px; line-height: 1.35; }
 .selic p { margin: 0; }
 .selic b, .selic .changed { color: var(--gold); }
@@ -247,29 +247,72 @@ body.panel-open .menu { visibility: hidden; }
 .acc-conta { --k: #cbd5e1; }
 .acc-save { --k: #22c55e; }
 .acc-invest { --k: #60a5fa; }
+/* aplicações: uma por linha, com o selo do tipo e, no pré e no IPCA+, o preço de venda hoje */
+.acc ul.lots { list-style: none; padding: 0; margin-top: 8px; display: grid; gap: 6px; }
+.lot { padding: 6px 8px; border-radius: 12px; background: rgb(255 255 255 / .1); border-left: 5px solid var(--t); }
+.lot-pos { --t: #93c5fd; }
+.lot-pre { --t: #f9a8d4; }
+.lot-ipca { --t: #c4b5fd; }
+.lot-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
+.lot-head b { font-size: 17px; }
+.lot-head span { margin-left: auto; }
+.acc .lot p { font-size: 12px; }
+.badge { font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--t); color: var(--ink); }
+.sell { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 12px; font-weight: 600; }
+.sell span { flex: 1; }
+.acc .sell b { font-size: 14px; }
+.mini { min-height: 32px; padding: 0 10px; border-radius: 10px; border: 3px solid var(--ink); color: var(--ink); font-size: 12px; background: linear-gradient(#ffffff, #d6e6ff); box-shadow: 0 2px 0 var(--ink); }
+.mini:active { transform: translateY(2px); box-shadow: none; }
 .move { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 10px; border-radius: 16px; background: rgb(10 20 46 / .35); }
 .move label { display: flex; align-items: center; gap: 8px; font-size: 15px; }
 .move input { flex: 1; min-width: 0; font: inherit; font-size: 20px; padding: 8px 12px; border-radius: 12px; border: 3px solid var(--ink); color: var(--navy); box-shadow: inset 0 3px 0 rgb(0 0 0 / .12); }
 .chips { display: flex; gap: 8px; }
 .chips button { flex: 1; min-height: 40px; border-radius: 12px; border: 3px solid var(--ink); background: linear-gradient(#ffffff, #d6e6ff); color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
 .chips button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+/* escolha do tipo de investimento */
+.tipos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.tipo {
+  display: grid; align-content: start; gap: 2px; padding: 8px 6px; border-radius: 12px; border: 3px solid var(--ink);
+  color: #fff; background: rgb(10 20 46 / .45); text-align: left; font-size: 11px; line-height: 1.2; border-top: 6px solid var(--t);
+}
+.tipo b { font-size: 13px; }
+.tipo span { font-weight: 600; opacity: .9; }
+.tipo[aria-pressed="true"] { background: linear-gradient(#fff07a, #ffc914); color: var(--ink); box-shadow: 0 3px 0 var(--ink); }
+.tipo-pos { --t: #93c5fd; }
+.tipo-pre { --t: #f9a8d4; }
+.tipo-ipca { --t: #c4b5fd; }
+.tipo-info { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.3; opacity: .9; }
 .actions { display: grid; gap: 10px; }
 .act { min-height: 48px; border-radius: 14px; border: 3px solid var(--ink); color: #fff; font-size: 16px; --sw: 4px; box-shadow: var(--toy); }
 .act:active { transform: translateY(4px); box-shadow: var(--toy-down); }
 .act:disabled { opacity: .6; }
 .act-save { background: linear-gradient(#4ee6a8, #059669); }
 .act-invest { background: linear-gradient(#7cb8ff, #1d4ed8); }
+.act-invest.act-pre { background: linear-gradient(#ff9fd0, #c0267a); }
+.act-invest.act-ipca { background: linear-gradient(#b9a4ff, #6d28d9); }
 .act-out { background: linear-gradient(#a8b6c8, #475569); }
 .act-goal { background: linear-gradient(#ff8cc6, #be185d); }
 .msg { margin: 0; min-height: 1.2em; font-size: 14px; color: #fff59d; }
-.projection { padding: 10px 12px; border-radius: 16px; background: rgb(10 20 46 / .5); --still: #cbd5e1; --poup: #fbbf24; --save: #4ade80; --invest: #93c5fd; }
+.projection { padding: 10px 12px; border-radius: 16px; background: rgb(10 20 46 / .5); --still: #cbd5e1; --poup: #fbbf24; --save: #4ade80; --invest: #93c5fd; --pre: #f9a8d4; --ipca: #c4b5fd; }
 .projection h3 { margin: 0 0 6px; font-size: 15px; }
 .projection svg { display: block; width: 100%; height: auto; }
 .projection polyline { fill: none; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
-.legend { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 12px; }
+.legend { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 12px; }
 .legend li { display: grid; padding-top: 4px; border-top: 4px solid var(--c); }
 .legend b { font-size: 15px; }
 .note { margin: 6px 0 0; font-size: 11px; font-weight: 600; opacity: .8; }
+/* simulador: cenários da Selic e a lição de cada um */
+.cenarios { margin-bottom: 8px; }
+.cenarios button { font-size: 12px; min-height: 36px; }
+.cenarios button[aria-pressed="true"] { background: linear-gradient(#fff07a, #ffc914); }
+.lesson { margin: 6px 0 0; font-size: 13px; line-height: 1.35; }
+.lesson b { color: var(--gold); }
+/* guia "Aprenda" */
+.guia { padding: 10px 12px; border-radius: 16px; background: rgb(10 20 46 / .5); }
+.guia h3 { margin: 0 0 4px; font-size: 15px; letter-spacing: .04em; }
+.guia details { padding: 6px 0; border-top: 2px solid rgb(255 255 255 / .15); }
+.guia summary { cursor: pointer; font-size: 14px; color: var(--gold); }
+.guia p { margin: 6px 0 0; font-size: 13px; font-weight: 600; line-height: 1.4; }
 
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
 .card { display: grid; justify-items: center; gap: 4px; padding: 10px 6px; border-radius: 16px; background: rgb(10 20 46 / .5); color: #fff; box-shadow: 0 4px 0 var(--ink); }

@@ -4,6 +4,7 @@ Primeiro acesso com um usuário novo cria a conta; depois, a mesma senha é exig
 O dinheiro mora aqui: o jogo só mostra. Regras e preços vêm de src/edu/catalog.json (o mesmo que o jogo lê).
 Valores em centavos inteiros. Cada corrida de pelo menos `metrosParaMes` conta como um mês de rendimento,
 à taxa Selic do Banco Central (buscada a cada 24 h; sem rede vale a última gravada ou a reserva do catálogo).
+Investimentos: pós-fixado (Selic do mês), prefixado (taxa travada pela expectativa do Boletim Focus) e IPCA+.
 Uso: python3 server.py [porta]   (padrão 8042; só biblioteca padrão; LEVI_DB troca o arquivo do banco)
 """
 
@@ -73,9 +74,13 @@ def check_or_create(login, password):
     return secrets.compare_digest(stored, hash_pw(password, stored.split("$")[0]))
 
 
-# ---------- Taxas do Banco Central (SGS): Selic meta e IPCA de 12 meses, em % ao ano ----------
+# ---------- Taxas do Banco Central: Selic meta e IPCA de 12 meses (SGS), Selic esperada (Boletim Focus) ----------
 
 SERIES = {"selic": 432, "ipca": 13522}
+FOCUS = ("https://olinda.bcb.gov.br/olinda/servico/Expectativas/versao/v1/odata/ExpectativasMercadoSelic"
+         "?$top=40&$orderby=Data%20desc&$filter=baseCalculo%20eq%200&$format=json")
+# o Copom se reúne a cada ~45 dias: o prazo do prefixado (em meses) cobre esse tanto de reuniões
+REUNIOES_NO_PRAZO = max(1, round(BANCO["prazoPrefixado"] / 1.5))
 
 
 def baixar(serie):
@@ -89,16 +94,34 @@ def baixar(serie):
     raise erro
 
 
-def atualizar_taxas(baixar=baixar):
-    """Grava o valor de hoje de cada série; sem rede ou com resposta estranha, fica o último gravado."""
-    for nome, serie in SERIES.items():
+def selic_esperada(linhas, reunioes=REUNIOES_NO_PRAZO):
+    """Média das medianas do Focus para as próximas `reunioes` do Copom, só da pesquisa mais recente."""
+    ultima = max(l["Data"] for l in linhas)
+    def ordem(l):
+        n, ano = l["Reuniao"].removeprefix("R").split("/")
+        return int(ano), int(n)
+    proximas = sorted((l for l in linhas if l["Data"] == ultima), key=ordem)[:reunioes]
+    return sum(float(l["Mediana"]) for l in proximas) / len(proximas)
+
+
+def baixar_focus():
+    with urllib.request.urlopen(FOCUS, timeout=10) as r:
+        return selic_esperada(json.load(r)["value"])
+
+
+FONTES = {**{nome: partial(baixar, serie) for nome, serie in SERIES.items()}, "selic_esperada": baixar_focus}
+
+
+def atualizar_taxas(fontes=FONTES):
+    """Grava o valor de hoje de cada fonte; sem rede ou com resposta estranha, fica o último gravado."""
+    for nome, buscar in fontes.items():
         try:
-            valor = baixar(serie)
+            valor = buscar()
             if not 0 <= valor < 100:
                 raise ValueError(valor)
             sql("insert into taxas values (?, ?, ?) on conflict(serie) do update set valor = excluded.valor, buscado_em = excluded.buscado_em",
                 nome, valor, int(time.time()))
-        except (OSError, ValueError, KeyError, IndexError, TypeError) as e:
+        except (OSError, ValueError, KeyError, IndexError, TypeError, ZeroDivisionError) as e:
             print(f"Banco Central indisponível ({nome}): {e!r}", file=sys.stderr)
 
 
@@ -107,7 +130,7 @@ def manter_taxas():
     dia = 24 * 3600
     while True:
         n, ultima = sql("select count(*), min(buscado_em) from taxas")[0]
-        espera = (ultima + dia - time.time()) if n == len(SERIES) else 0
+        espera = (ultima + dia - time.time()) if n == len(FONTES) else 0
         if espera <= 0:
             atualizar_taxas()
             espera = dia
@@ -119,17 +142,34 @@ def mensal(ao_ano):
     return (1 + ao_ano / 100) ** (1 / 12) - 1
 
 
+def anual(ao_mes):
+    """Fração ao mês → taxa % ao ano equivalente (o inverso de `mensal`)."""
+    return ((1 + ao_mes) ** 12 - 1) * 100
+
+
 def taxas():
     """Taxas em vigor: do Banco Central se já vieram alguma vez; senão a reserva do catálogo."""
     rows = {s: (v, t) for s, v, t in sql("select serie, valor, buscado_em from taxas")}
+    data = lambda quando: time.strftime("%d/%m/%Y", time.localtime(quando)) if quando else BANCO["reservaData"]
     selic, quando = rows.get("selic", (BANCO["selicReserva"], None))
+    ipca = rows.get("ipca", (BANCO["ipcaReserva"], None))[0]
+    esperada, focus_em = rows.get("selic_esperada", (BANCO["selicEsperadaReserva"], None))
     m = mensal(selic)
+    # prefixado: a mesma fatia da Selic que o pós paga, só que sobre a Selic que o mercado espera, mais um prêmio
+    prefixado_aa = anual(mensal(esperada) * BANCO["pctSelicInvestimento"]) + BANCO["premioPrefixado"]
     return {
         "selic": selic,
-        "ipca": rows.get("ipca", (BANCO["ipcaReserva"], None))[0],
+        "ipca": ipca,
         "cofrinho": m * BANCO["pctSelicCofrinho"],
         "investimento": m * BANCO["pctSelicInvestimento"],
-        "consultado": time.strftime("%d/%m/%Y", time.localtime(quando)) if quando else BANCO["reservaData"],
+        "selic_esperada": esperada,
+        "focus_consultado": data(focus_em),
+        "prefixado_aa": prefixado_aa,
+        "prefixado": mensal(prefixado_aa),
+        "ipca_mensal": mensal(ipca),
+        "ipca_real_aa": BANCO["jurosRealIpca"],
+        "ipca_real": mensal(BANCO["jurosRealIpca"]),
+        "consultado": data(quando),
         "ao_vivo": quando is not None,
     }
 
@@ -144,13 +184,33 @@ def render(valor, taxa):
     return int(valor * taxa + 0.5)
 
 
+# pós: carência sem resgate (como um CDB com carência); pré e IPCA+: vencimento com venda a preço de mercado
+PRAZOS = {"pos": BANCO["carencia"], "pre": BANCO["prazoPrefixado"], "ipca": BANCO["prazoIpca"]}
+
+
+def taxa_do_mes(ap, tx):
+    """Rendimento de um mês: o pós segue a Selic de agora; o pré e o juro real do IPCA+ ficaram travados na aplicação."""
+    tipo = ap.get("tipo", "pos")
+    if tipo == "pre":
+        return ap["taxa"]
+    if tipo == "ipca":
+        return (1 + tx["ipca_mensal"]) * (1 + ap["taxa"]) - 1
+    return tx["investimento"]
+
+
+def marcacao(valor, contratada, hoje, meses):
+    """Preço de venda antes do vencimento: o que o título paga no fim, descontado pela taxa que o mercado pede hoje.
+    No IPCA+ a inflação aparece dos dois lados e se cancela, então basta passar as taxas reais."""
+    return int(valor * ((1 + contratada) / (1 + hoje)) ** max(0, meses) + 0.5)
+
+
 def fim_de_corrida(acc, distancia, patrimonio, tx):
     """Deposita o que a corrida juntou e, se a corrida valeu um mês, aplica o rendimento de `tx` (ver `taxas`). Devolve o resumo."""
     distancia = max(0, min(int(distancia), 1_000_000))
     # ponytail: o patrimônio vem do cliente; o teto pela distância só limita o estrago de quem forjar
     deposito = max(0, min(int(patrimonio), distancia * BANCO["tetoPorMetro"]))
     acc["conta"] += deposito
-    resumo = {"deposito": deposito, "mes": False, "cofrinho": 0, "investimento": 0, "liberado": 0}
+    resumo = {"deposito": deposito, "mes": False, "cofrinho": 0, "investimento": 0, "liberado": 0, "vencidos": []}
     if distancia < BANCO["metrosParaMes"]:
         return resumo
     acc["mes"] += 1
@@ -159,20 +219,50 @@ def fim_de_corrida(acc, distancia, patrimonio, tx):
     acc["cofrinho"] += resumo["cofrinho"]
     ativas = []
     for ap in acc["aplicacoes"]:
-        r = render(ap["valor"], tx["investimento"])
+        r = render(ap["valor"], taxa_do_mes(ap, tx))
         ap["valor"] += r
         resumo["investimento"] += r
         if acc["mes"] >= ap["libera_em"]:
             acc["conta"] += ap["valor"]
             resumo["liberado"] += ap["valor"]
+            resumo["vencidos"].append(ap)
         else:
             ativas.append(ap)
     acc["aplicacoes"] = ativas
     return resumo
 
 
-def movimentar(acc, acao, valor):
-    """guardar (conta → cofrinho), sacar (cofrinho → conta) ou investir (conta → aplicação travada)."""
+def nova_aplicacao(acc, tipo, valor, tx):
+    ap = {"id": max((a.get("id", 0) for a in acc["aplicacoes"]), default=0) + 1, "tipo": tipo, "valor": valor, "aplicado": valor,
+          "libera_em": acc["mes"] + PRAZOS[tipo]}
+    if tipo == "pre":
+        ap.update(taxa=tx["prefixado"], taxa_aa=tx["prefixado_aa"])
+    elif tipo == "ipca":
+        ap.update(taxa=tx["ipca_real"], taxa_aa=tx["ipca_real_aa"])
+    return ap
+
+
+def resgatar(acc, id, tx):
+    ap = next((a for a in acc["aplicacoes"] if a["id"] == id), None)
+    if ap is None:
+        raise Recusado("Aplicação não encontrada")
+    if ap.get("tipo", "pos") == "pos":
+        raise Recusado("Pós-fixado com carência: só libera no vencimento")
+    hoje = tx["prefixado"] if ap["tipo"] == "pre" else tx["ipca_real"]
+    preco = marcacao(ap["valor"], ap["taxa"], hoje, ap["libera_em"] - acc["mes"])
+    acc["aplicacoes"].remove(ap)
+    acc["conta"] += preco
+    return {"resgate": preco, "na_curva": ap["valor"], "tipo": ap["tipo"]}
+
+
+def movimentar(acc, acao, valor=None, tipo=None, id=None, tx=None):
+    """guardar (conta → cofrinho), sacar (cofrinho → conta), investir (conta → aplicação do `tipo`: pos, pre ou ipca)
+    ou resgatar (aplicação `id` → conta, a preço de mercado). Devolve o resumo do resgate; as outras, None."""
+    if acao == "resgatar":
+        try:
+            return resgatar(acc, int(id), tx or taxas())
+        except (TypeError, ValueError):
+            raise Recusado("Aplicação não encontrada")
     try:
         valor = int(valor)
     except (TypeError, ValueError):
@@ -182,6 +272,9 @@ def movimentar(acc, acao, valor):
     origem = "cofrinho" if acao == "sacar" else "conta"
     if acao not in ("guardar", "sacar", "investir"):
         raise Recusado("Operação desconhecida")
+    tipo = tipo or "pos"
+    if acao == "investir" and tipo not in PRAZOS:
+        raise Recusado("Tipo de investimento desconhecido")
     if acc[origem] < valor:
         raise Recusado("Saldo insuficiente")
     acc[origem] -= valor
@@ -190,7 +283,7 @@ def movimentar(acc, acao, valor):
     elif acao == "sacar":
         acc["conta"] += valor
     else:
-        acc["aplicacoes"].append({"valor": valor, "libera_em": acc["mes"] + BANCO["carencia"]})
+        acc["aplicacoes"].append(nova_aplicacao(acc, tipo, valor, tx or taxas()))
 
 
 def comprar(acc, skin_id):
@@ -224,6 +317,14 @@ def carregar(login):
     row = sql(f"select {', '.join(COLS)} from contas where login = ?", login)[0]
     acc = dict(zip(COLS, row))
     acc["aplicacoes"], acc["skins"] = json.loads(acc["aplicacoes"]), json.loads(acc["skins"])
+    # aplicações de antes dos tipos: eram todas pós-fixadas e não tinham id
+    proximo = max((a.get("id", 0) for a in acc["aplicacoes"]), default=0)
+    for ap in acc["aplicacoes"]:
+        ap.setdefault("tipo", "pos")
+        ap.setdefault("aplicado", ap["valor"])
+        if "id" not in ap:
+            proximo += 1
+            ap["id"] = proximo
     return acc
 
 
@@ -315,7 +416,7 @@ class Handler(SimpleHTTPRequestHandler):
                     sql("update players set best = max(best, ?) where login = ?", score, login)
                     resumo = fim_de_corrida(acc, body.get("distancia", 0), body.get("patrimonio", 0), taxas())
                 elif self.path == "/api/banco":
-                    movimentar(acc, body.get("acao"), body.get("valor"))
+                    resumo = movimentar(acc, body.get("acao"), body.get("valor"), body.get("tipo"), body.get("id"))
                 elif self.path == "/api/loja":
                     comprar(acc, body.get("skin"))
                 elif self.path == "/api/vestir":
