@@ -60,10 +60,12 @@ export function backdrop(art) {
 
   // nuvens
   const cloud = far(srgb(1, 0.98, 0.96), true);
+  // nuvem é borrão sem luz: só o contorno conta, e com menos da metade dos triângulos do morro
+  const puff = new SphereGeometry(1, 20, 10);
   for (let i = 0; i < 9; i++) {
     const [x, y, z] = [-600 + i * 150, 170 + (i % 3) * 40, -700 + (i % 2) * 120];
     for (const [dx, dy, r] of [[0, 0, 34], [30, -6, 24], [-32, -8, 26], [12, 10, 22]]) {
-      b.add(sphere, cloud, tf(x + dx, y + dy, z, undefined, [r * 1.6, r * 0.6, r]), false);
+      b.add(puff, cloud, tf(x + dx, y + dy, z, undefined, [r * 1.6, r * 0.6, r]), false);
     }
   }
 

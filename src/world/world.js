@@ -1,6 +1,6 @@
 // Pista: trechos de cenário reciclados, fileiras de obstáculos e moedas, rolagem e colisão.
 
-import { Group, Quaternion, Vector2, Vector3 } from "three";
+import { Group, Object3D, Quaternion, Vector2, Vector3 } from "three";
 import {
   CAR_GAP,
   CAR_LEN,
@@ -18,13 +18,19 @@ import {
 import { Phase } from "../game.js";
 import { Batch, clearBatched } from "./batch.js";
 import { groundAt, hit } from "./collision.js";
-import { Props } from "./props.js";
+import { Coins, Props } from "./props.js";
 import { buildTile } from "./zones.js";
 
 const UP = new Vector3(0, 1, 0);
 const COIN_HALF = new Vector3(0.45, 0.45, 0.45);
 /** com o ímã, alcança as faixas vizinhas e as moedas no alto */
 const MAGNET_HALF = new Vector3(2.9, 2.2, 1.2);
+/**
+ * LOD do cenário: trecho com o centro além daqui (z) fica na versão de longe (`Art.low`, cores lisas num
+ * material só, sem sombra).
+ * A sombra só cobre até z = -85, e o sol joga as sombras para longe da câmera: nada some de perto.
+ */
+const DETAIL_Z = -110;
 
 /**
  * Algo que anda junto com o mundo.
@@ -46,7 +52,10 @@ export class World {
     this.root = root;
     this.game = game;
     this.art = art;
-    /** @type {{obj: Group, serial: number, dirty: boolean}[]} */
+    /**
+     * `rng`: estado do gerador antes da primeira montagem, para a versão de perto sair igual à de longe.
+     * @type {{obj: Group, serial: number, dirty: boolean, detailed: boolean, zone?: string, gate?: boolean, rng?: number}[]}
+     */
     this.tiles = [];
     /** @type {Item[]} */
     this.items = [];
@@ -59,11 +68,13 @@ export class World {
 
     if (!art) return;
     this.props = new Props(art);
+    this.coins = new Coins(art);
+    root.add(...this.coins.meshes);
     for (let i = 0; i < TILES; i++) {
       const obj = new Group();
       obj.position.z = -i * TILE_LEN;
       root.add(obj);
-      this.tiles.push({ obj, serial: i, dirty: true });
+      this.tiles.push({ obj, serial: i, dirty: true, detailed: false });
     }
     // ônibus estacionado na rua, atrás do Levi na tela inicial (fora das faixas: nunca bate)
     this.vehicle(0, 6.2, -9, 0);
@@ -118,7 +129,11 @@ export class World {
     if (gone) this.items = this.items.filter((it) => !it.gone);
   }
 
-  /** (Re)monta os trechos marcados; após reiniciar a corrida volta tudo para Copacabana. */
+  /**
+   * (Re)monta os trechos marcados; após reiniciar a corrida volta tudo para Copacabana. Trecho reciclado
+   * nasce lá no fundo na versão de longe; ao passar de `DETAIL_Z` ganha a de perto, um trecho por quadro
+   * (o trabalho se espalha em vez de travar um quadro só).
+   */
   decorate() {
     const g = this.game;
     if (g.distance < this.lastDistance) for (const t of this.tiles) t.dirty = true;
@@ -126,22 +141,46 @@ export class World {
     for (const tile of this.tiles) {
       if (!tile.dirty) continue;
       const d = g.distance - tile.obj.position.z;
-      const zone = zoneAt(d);
-      const gate = d > TILE_LEN && zone !== zoneAt(d - TILE_LEN);
-      clearBatched(tile.obj);
-      const b = new Batch();
-      buildTile(b, this.art, zone, tile.serial, gate, g);
-      b.build(tile.obj);
+      tile.zone = zoneAt(d);
+      tile.gate = d > TILE_LEN && tile.zone !== zoneAt(d - TILE_LEN);
+      tile.rng = g.rng;
+      this.#build(tile, tile.obj.position.z > DETAIL_Z);
       tile.dirty = false;
     }
+    const near = this.tiles.find((t) => !t.detailed && t.obj.position.z > DETAIL_Z);
+    if (near) {
+      // remonta com os mesmos sorteios da primeira vez, sem mexer na sequência do gerador da corrida
+      const rng = g.rng;
+      g.rng = near.rng;
+      this.#build(near, true);
+      g.rng = rng;
+    }
+  }
+
+  #build(tile, detailed) {
+    clearBatched(tile.obj);
+    const b = new Batch(detailed ? {} : { low: this.art.low, shadows: false, palette: this.art.palette });
+    buildTile(b, this.art, tile.zone, tile.serial, tile.gate, this.game);
+    b.build(tile.obj);
+    tile.detailed = detailed;
+  }
+
+  /** Passa as moedas para as malhas instanciadas; depois da câmera do quadro. */
+  drawCoins(eye) {
+    this.coins?.update(this.#coinObjects(), eye);
+  }
+
+  *#coinObjects() {
+    for (const it of this.items) if (it.coin) yield it.obj;
   }
 
   // ---------- obstáculos ----------
 
+  /** Moeda é só posição e giro: quem desenha é `Coins`, instanciada (fora do grafo da cena). */
   coin(x, y, z) {
-    const obj = this.props.coin();
+    const obj = new Object3D();
     obj.position.set(x, y, z);
-    this.add({ obj, coin: true });
+    this.items.push({ obj, coin: true });
   }
 
   coinRow(x, z) {

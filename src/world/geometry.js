@@ -32,9 +32,9 @@ export function tiledBox([w, h, d], [cellX, cellY]) {
 /**
  * Caixa com cantos arredondados de raio `r` e normais suaves (visual de brinquedo, nada de quina viva).
  * UV em metros a partir do canto; nas laterais u corre ao longo da face e v vai de cima para baixo.
+ * @param {number} K segmentos por quarto de curva (1 = chanfro, para o LOD de longe: mesmo UV, 1/5 dos triângulos)
  */
-export function roundedBox([sx, sy, sz], r) {
-  const K = 3; // segmentos por quarto de curva
+export function roundedBox([sx, sy, sz], r, K = 3) {
   const h = [sx / 2, sy / 2, sz / 2];
   r = Math.min(Math.max(r, 1e-3), Math.min(...h));
   // pontos ao longo de um eixo: curva de K passos em cada borda (ângulos iguais) e miolo plano

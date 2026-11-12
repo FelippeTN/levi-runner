@@ -1,4 +1,4 @@
-import { Group, Mesh } from "three";
+import { Float32BufferAttribute, Group, Mesh } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 /**
@@ -8,6 +8,23 @@ import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 export class Batch {
   /** @type {Map<string, {material: import("three").Material, cast: boolean, parts: import("three").BufferGeometry[]}>} */
   #groups = new Map();
+  #low;
+  #shadows;
+  #palette;
+
+  /**
+   * @param {object} [options]
+   * @param {Map<import("three").BufferGeometry, import("three").BufferGeometry | null>} [options.low] LOD de longe:
+   *   troca cada malha pela versão simples (`Art.low`); `null` deixa a peça de fora
+   * @param {boolean} [options.shadows] false = nem projeta nem recebe sombra (longe da área de sombra)
+   * @param {import("three").Material} [options.palette] material com cor por vértice (`Art.palette`): as peças de
+   *   cor lisa entram todas nele, num draw call só, em vez de um por material (de longe o brilho de cada um não se vê)
+   */
+  constructor({ low = null, shadows = true, palette = null } = {}) {
+    this.#low = low;
+    this.#shadows = shadows;
+    this.#palette = palette;
+  }
 
   /**
    * @param {import("three").BufferGeometry} geometry
@@ -16,10 +33,23 @@ export class Batch {
    * @param {boolean} cast projeta sombra (chão plano não tem o que sombrear)
    */
   add(geometry, material, matrix, cast = true) {
+    if (this.#low?.has(geometry)) {
+      geometry = this.#low.get(geometry);
+      if (!geometry) return;
+    }
+    cast &&= this.#shadows;
+    const part = geometry.clone().applyMatrix4(matrix);
+    if (this.#palette && plain(material)) {
+      const { r, g, b } = material.color;
+      const colors = new Float32Array(part.attributes.position.count * 3);
+      for (let i = 0; i < colors.length; i += 3) colors.set([r, g, b], i);
+      part.setAttribute("color", new Float32BufferAttribute(colors, 3));
+      material = this.#palette;
+    }
     const key = `${material.uuid}:${cast}`;
-    let g = this.#groups.get(key);
-    if (!g) this.#groups.set(key, (g = { material, cast, parts: [] }));
-    g.parts.push(geometry.clone().applyMatrix4(matrix));
+    let group = this.#groups.get(key);
+    if (!group) this.#groups.set(key, (group = { material, cast, parts: [] }));
+    group.parts.push(part);
   }
 
   /** Malhas mescladas dentro de `group` (novo se omitido). */
@@ -27,7 +57,7 @@ export class Batch {
     for (const { material, cast, parts } of this.#groups.values()) {
       const mesh = new Mesh(mergeGeometries(parts), material);
       mesh.castShadow = cast;
-      mesh.receiveShadow = true;
+      mesh.receiveShadow = this.#shadows;
       mesh.matrixAutoUpdate = false;
       group.add(mesh);
       for (const p of parts) p.dispose();
@@ -35,6 +65,11 @@ export class Batch {
     this.#groups.clear();
     return group;
   }
+}
+
+/** Só cor: sem textura, sem brilho próprio e opaco (o resto mantém o material dele). */
+function plain(m) {
+  return m.isMeshStandardMaterial && !m.map && !m.transparent && m.emissive.getHex() === 0 && m.fog;
 }
 
 /** Remove os filhos de `group` liberando a geometria mesclada (que só eles usam). */

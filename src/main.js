@@ -27,7 +27,7 @@ const scene = new Scene();
 const game = new Game(0x12345678);
 const events = new Events();
 const fx = new Fx(scene);
-const { renderer, composer, resize } = createRenderer(canvas, scene, fx.camera);
+const { renderer, composer, resize, adaptive } = createRenderer(canvas, scene, fx.camera);
 
 const art = new Art();
 scene.add(backdrop(art));
@@ -116,10 +116,26 @@ canvas.focus();
 let elapsed = 0;
 let last = performance.now();
 
+/** `?stats` na URL: FPS, draw calls, triângulos e resolução, para conferir a otimização em qualquer aparelho. */
+const stats = new URLSearchParams(location.search).has("stats") && document.body.appendChild(document.createElement("pre"));
+if (stats) stats.style.cssText = "position:fixed;left:8px;bottom:8px;margin:0;padding:6px 8px;font:12px monospace;color:#fff;background:#000a;z-index:99;pointer-events:none";
+let statFrames = 0, statTime = 0;
+function showStats(ms) {
+  statFrames++;
+  statTime += ms;
+  if (statTime < 500) return;
+  const { calls, triangles } = renderer.info.render;
+  stats.textContent = `${((statFrames * 1000) / statTime).toFixed(0)} fps  ${(statTime / statFrames).toFixed(1)} ms\n${calls} draws  ${(triangles / 1000).toFixed(0)}k tris\nresolução ${adaptive.ratio}x`;
+  statFrames = statTime = 0;
+}
+
 /** Um quadro, na mesma ordem dos sistemas do jogo original. */
 function frame(now) {
-  const realDt = Math.min((now - last) / 1000, 0.25);
+  const frameMs = now - last;
+  const realDt = Math.min(frameMs / 1000, 0.25);
   last = now;
+  adaptive.frame(frameMs);
+  renderer.info.reset();
   const keys = input.poll();
 
   // Esc / P / botão de pausa congelam o tempo do jogo durante a corrida
@@ -152,12 +168,14 @@ function frame(now) {
   if (interest) events.money.push({ text: `+${brl(interest)} de juros`, good: true });
   player.animate(game, elapsed, dt);
   fx.update(dt, game, player, events, world.dz);
+  world.drawCoins(fx.camera.position);
   if (keys.pressed("KeyM")) audio.toggleMute();
   audio.update(dt, game, events);
   hud.update(dt, game, paused, audio.muted, events);
   menu.update(game);
 
   composer.render();
+  if (stats) showStats(frameMs);
   events.clear();
   requestAnimationFrame(frame);
 }

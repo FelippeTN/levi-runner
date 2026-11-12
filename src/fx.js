@@ -57,6 +57,9 @@ export function shadowFrame(scrolled) {
   return { center, diameter, depth: max.z - min.z, texel };
 }
 
+// reaproveitados pela câmera a cada quadro (sem lixo para o coletor)
+const _eye = new Vector3(), _look = new Vector3(), _to = new Vector3();
+
 export class Fx {
   trauma = 0;
   x = 0;
@@ -133,10 +136,10 @@ export class Fx {
     const k = this.trauma * this.trauma * 0.4;
     const lift = p.y;
     // no teto dos veículos a câmera sobe junto
-    const eye = new Vector3(this.x, 2.4, 5.5).lerp(new Vector3(this.x, 5.5 + lift * 0.6, 9), this.zoom);
+    const eye = _eye.set(this.x, 2.4, 5.5).lerp(_to.set(this.x, 5.5 + lift * 0.6, 9), this.zoom);
     eye.x += Math.sin(this.t * 37) * k;
     eye.y += Math.sin(this.t * 53) * k;
-    const look = new Vector3(this.x, 1.1, 0).lerp(new Vector3(this.x, 1.5 + lift * 0.5, -6), this.zoom);
+    const look = _look.set(this.x, 1.1, 0).lerp(_to.set(this.x, 1.5 + lift * 0.5, -6), this.zoom);
     const cam = this.camera;
     cam.position.copy(eye);
     cam.lookAt(look);

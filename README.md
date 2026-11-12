@@ -19,6 +19,17 @@ pnpm test              # física, colisão, economia, malhas, sombra (node) e re
 ./build.sh             # testa e gera dist/; depois sirva com: python3 server.py [porta]
 ```
 
+Com `?stats` no endereço (ex.: `localhost:5173/?stats`) aparece um painel com FPS, draw calls, triângulos e a
+resolução atual, para conferir o desempenho em qualquer aparelho.
+
+## Desempenho
+
+- **LOD do cenário**: o trecho nasce no fundo na versão de longe (malhas com menos polígonos de `Art.low`, cores lisas
+  num material só, sem sombra) e ganha a versão de perto ao passar de 110 m, um trecho por quadro, com os mesmos sorteios.
+- **LOD dos obstáculos**: veículos (55 m), cavaletes e placas (35 m) trocam de nível com histerese.
+- **Moedas instanciadas**: todas em 3 draw calls, uma por nível (cheia, 40 m, 110 m).
+- **Resolução adaptativa**: cai 0,25× quando a média passa de 20 ms e volta quando folga, sem ficar oscilando.
+
 ## Código
 
 | Arquivo | O que faz |

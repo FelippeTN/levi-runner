@@ -33,17 +33,33 @@ export class Art {
     const [tCalc, tCob, tAsph, tSand, tSea] = [tex.calcadao(), tex.cobble(), tex.asphalt(), tex.sand(), tex.sea()];
 
     // ---------- geometria ----------
+    /**
+     * LOD: malha de longe de cada malha de perto (`null` = some de longe). O `Batch` troca na montagem, então
+     * cenário e veículos de longe são as mesmas peças nos mesmos lugares, só com menos polígonos.
+     * @type {Map<import("three").BufferGeometry, import("three").BufferGeometry | null>}
+     */
+    this.low = new Map();
     this.cube = new BoxGeometry(1, 1, 1);
     this.sphere = new SphereGeometry(1, 16, 10);
     this.cylinder = new CylinderGeometry(1, 1, 1, 16);
     this.cone = new ConeGeometry(1, 1, 16);
+    this.low.set(this.sphere, new SphereGeometry(1, 8, 6));
+    this.low.set(this.cylinder, new CylinderGeometry(1, 1, 1, 7));
+    this.low.set(this.cone, new ConeGeometry(1, 1, 8));
     this.plane = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     this.ramp = geo.ramp(2.2, CAR_TOP, RAMP_LEN);
     this.archBig = geo.arch(12, 10, 3, 5, 4.5);
     this.arch = geo.arch(6, 10, 3, 2.3, 5.5);
     this.archTop = geo.arch(6, 5, 3, 1.9, 1.6);
-    /** moeda cheia de perto, disco simples a 40 m e mais simples ainda a 110 m */
-    this.coinLevels = [[geo.coin(), 0], [new CylinderGeometry(0.42, 0.42, 0.14, 12), 40], [new CylinderGeometry(0.42, 0.42, 0.14, 6), 110]];
+    /**
+     * Moeda de pé (face para +z): [malha, a partir de quantos metros, projeta sombra]. Cheia de perto, disco
+     * simples a 40 m e mais simples ainda a 110 m, já fora da área de sombra.
+     */
+    this.coinLevels = [
+      [geo.coin(), 0, true],
+      [new CylinderGeometry(0.42, 0.42, 0.14, 12), 40, true],
+      [new CylinderGeometry(0.42, 0.42, 0.14, 6), 110, false],
+    ].map(([g, distance, cast]) => [g.rotateX(Math.PI / 2), distance, cast]);
 
     // prédios: [geometria, tamanho] com UV em metros para a fachada repetir sem esticar
     const sizes = (list, cell) => list.map((s) => [geo.tiledBox(s, cell), s]);
@@ -53,7 +69,11 @@ export class Art {
     this.roofs = [[6.5, 8], [8, 8], [9, 9]].map(([w, d]) => [geo.gable(w, 2.2, d), [w, 2.2, d]]);
 
     // peças arredondadas (cada proporção tem sua malha para o raio não esticar)
-    const rb = (x, y, z, r) => geo.roundedBox([x, y, z], r);
+    const rb = (x, y, z, r) => {
+      const g = geo.roundedBox([x, y, z], r);
+      this.low.set(g, geo.roundedBox([x, y, z], r, 1));
+      return g;
+    };
     this.rBody = rb(2.2, 2, CAR_LEN, 0.25);
     this.rWindshield = rb(1.7, 0.8, 0.14, 0.14);
     this.rLed = rb(1.3, 0.18, 0.08, 0.04);
@@ -68,6 +88,9 @@ export class Art {
     this.rTram = rb(7, 2.4, 2.2, 0.45);
     // teto gordo de desenho animado: cápsula deitada, achatada na montagem
     this.rRoof = new CapsuleGeometry(0.5, CAR_LEN - 1.2, 6, 16);
+    this.low.set(this.rRoof, new CapsuleGeometry(0.5, CAR_LEN - 1.2, 2, 8));
+    // retrovisor de longe é menos que um pixel
+    this.low.set(this.rMirror, null);
 
     // ---------- materiais ----------
     const pastel = [[0.98, 0.97, 0.94], [0.97, 0.9, 0.78], [0.82, 0.9, 0.96], [0.98, 0.86, 0.84], [0.93, 0.93, 0.86]];
@@ -118,6 +141,8 @@ export class Art {
     this.coinMat = new MeshStandardMaterial({ map: face, emissiveMap: face, emissive: new Color(1.3, 1.3, 1.3), metalness: 0.7, roughness: 0.3 });
     this.glass = new MeshStandardMaterial({ color: srgb(0.5, 0.7, 0.86), roughness: 0.12 });
     this.led = glow(5, 2.2, 0.2);
+    /** LOD de longe: todas as peças de cor lisa num material só, cor por vértice (ver `Batch`) */
+    this.palette = new MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
     this.blink = glow(8, 3, 0.3);
   }
 
