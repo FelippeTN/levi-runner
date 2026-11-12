@@ -117,3 +117,52 @@ export function runsUntil(goal, balance, perRun, rate) {
   }
   return Infinity;
 }
+
+/**
+ * Corridas até juntar `goal` e quanto desse caminho os juros pagaram (o resto veio do saldo e das corridas).
+ * @returns {{runs: number, juros: number}} runs = Infinity se não chega em 999 corridas
+ */
+export function pathTo(goal, balance, perRun, rate) {
+  let saved = balance;
+  for (let n = 0; n < 999; n++) {
+    if (saved >= goal) return { runs: n, juros: Math.max(0, saved - balance - n * perRun) };
+    saved = saved * (1 + rate) + perRun;
+  }
+  return { runs: Infinity, juros: 0 };
+}
+
+// ---------- Clube do Investidor: o nível vem dos rendimentos acumulados (o `nivel` do server.py) ----------
+
+export const CLUBE = catalog.clube;
+
+/**
+ * Nível atual, o próximo e o progresso até ele.
+ * @param {number} rendimentos centavos de juros já recebidos
+ */
+export function clube(rendimentos) {
+  const i = CLUBE.findLastIndex((n) => rendimentos >= n.rendimentos);
+  const atual = CLUBE[i], proximo = CLUBE[i + 1] ?? null;
+  const progresso = proximo ? (rendimentos - atual.rendimentos) / (proximo.rendimentos - atual.rendimentos) : 1;
+  return { atual, proximo, falta: proximo ? proximo.rendimentos - rendimentos : 0, progresso };
+}
+
+/** Nível exigido por uma skin (ou null) e se `rendimentos` já alcançam. */
+export function exigido(skin, rendimentos) {
+  const n = CLUBE.find((c) => c.id === skin.nivel) ?? null;
+  return { nivel: n, liberada: !n || rendimentos >= n.rendimentos };
+}
+
+/**
+ * Corridas até os juros somarem `target`, com `balance` aplicado e mais `perRun` aplicado a cada corrida a `rate`.
+ * @returns {number} Infinity sem juros ou se não chega em 999 corridas
+ */
+export function runsToYield(target, balance, perRun, rate) {
+  let saved = balance, juros = 0;
+  for (let n = 0; n < 999; n++) {
+    if (juros >= target) return n;
+    const r = saved * rate;
+    juros += r;
+    saved += r + perRun;
+  }
+  return Infinity;
+}

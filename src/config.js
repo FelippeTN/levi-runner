@@ -9,8 +9,8 @@ export const MAX_DT = 0.04;
 /** Fim da neblina: até aqui nada some; o que nasce ou reaparece além disso entra sem ser visto. */
 export const FOG_END = 250;
 export const SPAWN_Z = -FOG_END;
-/** Fileira inicial: as primeiras já começam a meio caminho (160 m da largada). */
-export const FIRST_ROW = 160 + SPAWN_Z;
+/** Fileira inicial: a primeira já começa perto (80 m da largada, ~6 s na velocidade inicial). */
+export const FIRST_ROW = 80 + SPAWN_Z;
 /** Veículo na contramão só acelera a partir daqui, para a distância de reação não crescer com o alcance. */
 export const MOVER_WAKE_Z = -130;
 export const TILE_LEN = 20;

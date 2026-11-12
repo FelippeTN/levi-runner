@@ -122,6 +122,22 @@ export function resgateTexto({ resgate, na_curva }) {
     : `Resgatado por ${brl(resgate)}, ${brl(dif)} acima da curva: os juros caíram e o título travado numa taxa maior ganhou valor.`;
 }
 
+// ---------- Clube do Investidor (loja e banco) ----------
+
+export const CLUBE_EXPLICA =
+  "No Clube do Investidor quem sobe de nível é o dinheiro que trabalha: só contam os juros que o cofrinho e os investimentos já pagaram. " +
+  "Moeda da corrida enche a conta; juro é dinheiro que nasce do dinheiro. Quanto antes você guarda, mais rápido sobe, porque os juros do mês seguinte " +
+  "rendem sobre os juros do mês anterior: são os juros compostos.";
+
+/** @param {{selo: string, nome: string}} nivel @param {{nome: string}[]} liberadas skins que o nível libera */
+export const subiuTexto = (nivel, liberadas) =>
+  `${nivel.selo} Você subiu para ${nivel.nome} no Clube do Investidor!` +
+  (liberadas.length ? ` Liberou na loja: ${liberadas.map((s) => s.nome).join(", ")}.` : "");
+
+/** Por que investir chega antes: o quanto do preço os juros pagam no caminho. @param {number} juros @param {number} preco centavos */
+export const jurosPagam = (juros, preco) =>
+  juros >= 100 ? `os juros pagam ${brl(juros)} (${Math.round((100 * juros) / preco)}% do preço)` : "quase sem juros";
+
 // ---------- Guia "Aprenda": prefixado, pós-fixado e IPCA+ ----------
 
 export const GUIA_RENDA_FIXA = [

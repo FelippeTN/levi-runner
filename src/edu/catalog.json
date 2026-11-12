@@ -1,5 +1,5 @@
 {
-  "_leia": "Regras e preços do dinheiro do jogo, lidos pelo jogo e pelo server.py. Valores em centavos. O banco rende a Selic do Banco Central (o server.py busca); as taxas da corrida são de jogo. Investimentos com taxas de mercado: pós-fixado (pctSelicInvestimento da Selic, como um CDB com carência que paga ~105% do CDI; carência em corridas), prefixado (taxa travada = Selic média esperada pelo Boletim Focus × pctSelicInvestimento + premioPrefixado, o prêmio de prazo, em p.p. ao ano; fica perto do que um CDB ou o Tesouro Prefixado de 1 ano pagam) e IPCA+ (IPCA do mês + jurosRealIpca % ao ano travado; a taxa real é parâmetro do jogo, de ordem parecida com a do Tesouro IPCA+).",
+  "_leia": "Regras e preços do dinheiro do jogo, lidos pelo jogo e pelo server.py. Valores em centavos. O banco rende a Selic do Banco Central (o server.py busca); as taxas da corrida são de jogo. Investimentos com taxas de mercado: pós-fixado (pctSelicInvestimento da Selic, como um CDB com carência que paga ~105% do CDI; carência em corridas), prefixado (taxa travada = Selic média esperada pelo Boletim Focus × pctSelicInvestimento + premioPrefixado, o prêmio de prazo, em p.p. ao ano; fica perto do que um CDB ou o Tesouro Prefixado de 1 ano pagam) e IPCA+ (IPCA do mês + jurosRealIpca % ao ano travado; a taxa real é parâmetro do jogo, de ordem parecida com a do Tesouro IPCA+). Clube do Investidor: o nível vem dos rendimentos acumulados (juros que o cofrinho e os investimentos pagaram, em centavos; moedas da corrida não contam); skins com `nivel` só são vendidas a partir daquele nível.",
   "moeda": 1000,
   "imprevisto": 5000,
   "corrida": {
@@ -22,17 +22,22 @@
     "jurosRealIpca": 6
   },
   "skins": [
-    { "id": "classico", "nome": "Levi Clássico", "tipo": "pintura", "preco": 0 },
-    { "id": "verde_amarelo", "nome": "Verde-Amarelo", "tipo": "pintura", "preco": 80000,
-      "cores": { "corpo": "#fff3a6", "branco": "#ffe14a", "azul": "#16a34a", "preto": "#0b3d91" } },
-    { "id": "oculos", "nome": "Óculos Escuros", "tipo": "acessorio", "preco": 120000, "modelo": "oculos" },
-    { "id": "por_do_sol", "nome": "Pôr do Sol de Ipanema", "tipo": "pintura", "preco": 150000,
-      "cores": { "corpo": "#ffe0d0", "branco": "#ffc6d9", "azul": "#ff6a2b", "preto": "#7a1f5c" } },
-    { "id": "panama", "nome": "Chapéu-Panamá da Lapa", "tipo": "acessorio", "preco": 250000, "modelo": "panama" },
-    { "id": "prancha", "nome": "Prancha nas Costas", "tipo": "acessorio", "preco": 400000, "modelo": "prancha", "costas": true },
-    { "id": "noite_lapa", "nome": "Noite na Lapa", "tipo": "pintura", "preco": 600000,
-      "cores": { "corpo": "#6b6488", "branco": "#2a2440", "azul": "#c04dff", "preto": "#ff3fa4" }, "brilho": "azul" },
-    { "id": "ouro", "nome": "Levi de Ouro", "tipo": "pintura", "preco": 1500000,
-      "cores": { "corpo": "#ffd75e", "branco": "#f2c230", "azul": "#fff1a8", "preto": "#8a5a00" }, "metal": true }
+    { "id": "classico", "nome": "Levi Clássico", "tipo": "pintura", "preco": 0, "desc": "O Levi de sempre, pronto para correr." },
+    { "id": "verde_amarelo", "nome": "Verde-Amarelo", "tipo": "pintura", "preco": 80000, "cores": {"corpo": "#fff3a6", "branco": "#ffe14a", "azul": "#16a34a", "preto": "#0b3d91"}, "desc": "As cores da torcida, para correr em dia de jogo." },
+    { "id": "oculos", "nome": "Óculos Escuros", "tipo": "acessorio", "preco": 120000, "modelo": "oculos", "desc": "Sol de Copacabana na cara? Sem problema." },
+    { "id": "por_do_sol", "nome": "Pôr do Sol de Ipanema", "tipo": "pintura", "preco": 150000, "cores": {"corpo": "#ffe0d0", "branco": "#ffc6d9", "azul": "#ff6a2b", "preto": "#7a1f5c"}, "desc": "O laranja e o rosa do fim de tarde no Arpoador." },
+    { "id": "panama", "nome": "Chapéu-Panamá da Lapa", "tipo": "acessorio", "preco": 250000, "modelo": "panama", "desc": "Clássico da boemia da Lapa, usado de lado." },
+    { "id": "prancha", "nome": "Prancha nas Costas", "tipo": "acessorio", "preco": 400000, "modelo": "prancha", "costas": true, "desc": "Para quem sai da corrida direto para o mar." },
+    { "id": "noite_lapa", "nome": "Noite na Lapa", "tipo": "pintura", "preco": 600000, "cores": {"corpo": "#6b6488", "branco": "#2a2440", "azul": "#c04dff", "preto": "#ff3fa4"}, "brilho": "azul", "desc": "Neon roxo dos Arcos da Lapa: brilha no escuro." },
+    { "id": "ouro", "nome": "Levi de Ouro", "tipo": "pintura", "preco": 1500000, "cores": {"corpo": "#ffd75e", "branco": "#f2c230", "azul": "#fff1a8", "preto": "#8a5a00"}, "metal": true, "desc": "O Levi inteiro banhado a ouro. Para poucos." },
+    { "id": "cofrinho_costas", "nome": "Cofrinho nas Costas", "tipo": "acessorio", "preco": 200000, "modelo": "cofrinho", "costas": true, "nivel": "poupador", "desc": "Quem guarda e deixa render carrega o cofrinho com orgulho." },
+    { "id": "esmeralda", "nome": "Levi Esmeralda", "tipo": "pintura", "preco": 500000, "nivel": "investidor", "cores": {"corpo": "#b8f5d4", "branco": "#1fa463", "azul": "#7cffc4", "preto": "#064e3b"}, "metal": true, "brilho": "azul", "desc": "Verde-joia que brilha: o selo de quem deixa os juros trabalharem." },
+    { "id": "coroa", "nome": "Coroa dos Juros Compostos", "tipo": "acessorio", "preco": 800000, "modelo": "coroa", "nivel": "mestre", "desc": "Juros sobre juros, corrida após corrida. Só o Mestre dos Juros usa." }
+  ],
+  "clube": [
+    { "id": "iniciante", "nome": "Iniciante", "selo": "🌱", "rendimentos": 0 },
+    { "id": "poupador", "nome": "Poupador", "selo": "🐷", "rendimentos": 20000 },
+    { "id": "investidor", "nome": "Investidor", "selo": "📈", "rendimentos": 80000 },
+    { "id": "mestre", "nome": "Mestre dos Juros", "selo": "👑", "rendimentos": 300000 }
   ]
 }

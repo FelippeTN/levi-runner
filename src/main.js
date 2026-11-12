@@ -107,6 +107,7 @@ const menu = new Menu(account, {
     shop: shopPanel(document.getElementById("shop"), account, {
       sfx,
       login: showLogin,
+      bank: () => menu.open("bank"),
       preview(pintura, acessorio, back) {
         player.wear?.(pintura, acessorio);
         player.setShowcase(true, back);

@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  marcacao, monthly, prefixadoAA, project, projectRates, RATES, selicPath, TIPOS, yearly,
+  CLUBE, clube, exigido, marcacao, monthly, pathTo, prefixadoAA, project, projectRates, RATES, runsToYield, selicPath, TIPOS, yearly,
 } from "../src/edu/bank.js";
 import catalog from "../src/edu/catalog.json" with { type: "json" };
 import { GUIA_RENDA_FIXA, pickTip, resgateTexto } from "../src/edu/dicas.js";
@@ -73,4 +73,40 @@ test("mensagem do resgate explica ganho ou perda da marcação", () => {
 test("guia cobre pós, pré, IPCA+ e marcação", () => {
   const titulos = GUIA_RENDA_FIXA.map((g) => g.titulo).join(" ");
   for (const t of ["Pós-fixado", "Prefixado", "IPCA+", "Marcação a mercado", "Como escolher"]) assert.ok(titulos.includes(t), t);
+});
+
+test("caminho até a skin: investir chega antes e os juros pagam parte", () => {
+  const parado = pathTo(100_000, 10_000, 10_000, 0);
+  assert.deepEqual(parado, { runs: 9, juros: 0 });
+  const investindo = pathTo(100_000, 10_000, 10_000, 0.05);
+  assert.ok(investindo.runs < parado.runs);
+  assert.ok(investindo.juros > 0);
+  assert.equal(pathTo(100_000, 0, 0, 0).runs, Infinity);
+  assert.equal(pathTo(100, 500, 0, 0.01).runs, 0);
+});
+
+test("Clube do Investidor: nível, progresso e skins exclusivas batem com o server.py", () => {
+  assert.equal(clube(0).atual.id, CLUBE[0].id);
+  assert.equal(clube(0).proximo.id, CLUBE[1].id);
+  const meio = (CLUBE[1].rendimentos + CLUBE[2].rendimentos) / 2;
+  assert.equal(clube(meio).atual.id, CLUBE[1].id);
+  close(clube(meio).progresso, 0.5);
+  assert.equal(clube(meio).falta, CLUBE[2].rendimentos - meio);
+  const topo = clube(10 ** 12);
+  assert.deepEqual([topo.atual.id, topo.proximo, topo.progresso], [CLUBE.at(-1).id, null, 1]);
+  // toda skin exclusiva aponta para um nível que existe, e só ele (ou acima) libera
+  for (const s of catalog.skins.filter((s) => s.nivel)) {
+    const n = CLUBE.find((c) => c.id === s.nivel);
+    assert.ok(n, s.id);
+    assert.equal(exigido(s, n.rendimentos - 1).liberada, false);
+    assert.equal(exigido(s, n.rendimentos).liberada, true);
+  }
+  assert.equal(exigido({ id: "x" }, 0).liberada, true);
+});
+
+test("corridas até os juros somarem o nível: parado nunca, investindo mais chega antes", () => {
+  assert.equal(runsToYield(1000, 100_000, 0, 0), Infinity);
+  assert.equal(runsToYield(0, 0, 0, 0), 0);
+  assert.equal(runsToYield(1000, 100_000, 0, 0.01), 1);
+  assert.ok(runsToYield(50_000, 100_000, 50_000, 0.01) < runsToYield(50_000, 100_000, 0, 0.01));
 });

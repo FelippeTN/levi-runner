@@ -1,7 +1,7 @@
 // Conta do jogador no Banco do Levi. O servidor é dono do dinheiro; aqui fica a cópia para mostrar.
 
 import { api, loggedIn } from "./api.js";
-import { setRates } from "./edu/bank.js";
+import { clube, setRates } from "./edu/bank.js";
 
 const GOAL = "levi-meta";
 const EARNINGS = "levi-ganhos";
@@ -29,7 +29,7 @@ export class Account extends EventTarget {
   /**
    * Aplicação: `tipo` pos | pre | ipca; `taxa` (fração ao mês) e `taxa_aa` (% ao ano) travadas no pré e no IPCA+ (juro real).
    * @typedef {{id: number, tipo: "pos" | "pre" | "ipca", valor: number, aplicado: number, libera_em: number, taxa?: number, taxa_aa?: number}} Aplicacao
-   * @type {null | {conta: number, cofrinho: number, aplicacoes: Aplicacao[], mes: number, skins: string[], pintura: string, acessorio: string | null}}
+   * @type {null | {conta: number, cofrinho: number, aplicacoes: Aplicacao[], mes: number, skins: string[], pintura: string, acessorio: string | null, rendimentos: number}}
    */
   data = null;
   /** resumo da última corrida (depósito, rendimento do mês) para o banco comemorar */
@@ -50,10 +50,16 @@ export class Account extends EventTarget {
     this.#changed();
   }
 
-  /** Fim de corrida: recorde, depósito e rendimento do mês. Sem login, nada (a corrida só não é guardada). */
+  /**
+   * Fim de corrida: recorde, depósito e rendimento do mês. Sem login, nada (a corrida só não é guardada).
+   * Se os juros fizeram subir de nível no Clube do Investidor, o resumo traz o nível novo em `subiu`.
+   */
   async finishRun({ pontos, distancia, patrimonio }) {
     if (!this.data) return null;
+    const antes = clube(this.rendimentos).atual;
     const r = await api("/api/corrida", { pontos, distancia: Math.floor(distancia), patrimonio });
+    const depois = clube(r.rendimentos ?? 0).atual;
+    r.resumo.subiu = depois.id !== antes.id ? depois : null;
     this.lastRun = r.resumo;
     this.data = r;
     setRates(r.taxas);
@@ -72,8 +78,9 @@ export class Account extends EventTarget {
   bank(acao, valor, extra = {}) {
     return this.#post("/api/banco", { acao, valor, ...extra });
   }
-  buy(skin) {
-    return this.#post("/api/loja", { skin });
+  /** Compra com a conta; com `cofrinho`, o que faltar sai do cofrinho. */
+  buy(skin, cofrinho = false) {
+    return this.#post("/api/loja", { skin, cofrinho });
   }
   wear(skin) {
     return this.#post("/api/vestir", { skin });
@@ -83,6 +90,11 @@ export class Account extends EventTarget {
   get total() {
     const d = this.data;
     return d ? d.conta + d.cofrinho + d.aplicacoes.reduce((s, a) => s + a.valor, 0) : 0;
+  }
+
+  /** Juros que o banco já pagou (cofrinho + investimentos), o que dá o nível no Clube do Investidor. */
+  get rendimentos() {
+    return this.data?.rendimentos ?? 0;
   }
 
   /** Média do que as últimas corridas depositaram. */

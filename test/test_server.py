@@ -16,7 +16,7 @@ MES = B["metrosParaMes"]
 
 
 def conta(**kw):
-    return {"conta": 0, "cofrinho": 0, "aplicacoes": [], "mes": 0, "skins": ["classico"], "pintura": "classico", "acessorio": None, **kw}
+    return {"conta": 0, "cofrinho": 0, "aplicacoes": [], "mes": 0, "skins": ["classico"], "pintura": "classico", "acessorio": None, "rendimentos": 0, **kw}
 
 
 class Banco(unittest.TestCase):
@@ -82,6 +82,41 @@ class Banco(unittest.TestCase):
             server.comprar(acc, "nao_existe")
         server.vestir(acc, None)
         self.assertIsNone(acc["acessorio"])
+
+    def test_loja_usa_o_cofrinho_so_se_pedir(self):
+        preco = server.SKINS["oculos"]["preco"]
+        acc = conta(conta=preco - 300, cofrinho=500)
+        with self.assertRaises(server.Recusado):
+            server.comprar(acc, "oculos")
+        with self.assertRaises(server.Recusado):
+            server.comprar(conta(conta=preco - 300, cofrinho=299), "oculos", cofrinho=True)
+        server.comprar(acc, "oculos", cofrinho=True)
+        self.assertEqual((acc["conta"], acc["cofrinho"]), (0, 200))
+        self.assertIn("oculos", acc["skins"])
+
+    def test_clube_soma_os_juros_e_libera_as_exclusivas(self):
+        acc = conta(cofrinho=100_000)
+        aplicacao = server.nova_aplicacao(acc, "pos", 50_000, TX)
+        acc["aplicacoes"].append(aplicacao)
+        r = server.fim_de_corrida(acc, MES, 5_000, TX)
+        # só juros contam: o depósito da corrida não
+        self.assertEqual(acc["rendimentos"], r["cofrinho"] + r["investimento"])
+        server.fim_de_corrida(acc, MES - 1, 5_000, TX)
+        self.assertEqual(acc["rendimentos"], r["cofrinho"] + r["investimento"])
+
+        exclusiva = next(s for s in server.CATALOG["skins"] if s.get("nivel"))
+        minimo = next(n["rendimentos"] for n in server.CLUBE if n["id"] == exclusiva["nivel"])
+        acc = conta(conta=exclusiva["preco"], rendimentos=minimo - 1)
+        with self.assertRaises(server.Recusado):
+            server.comprar(acc, exclusiva["id"])
+        acc["rendimentos"] = minimo
+        server.comprar(acc, exclusiva["id"])
+        self.assertIn(exclusiva["id"], acc["skins"])
+
+    def test_nivel_do_clube(self):
+        self.assertEqual(server.nivel(0)["id"], server.CLUBE[0]["id"])
+        self.assertEqual(server.nivel(server.CLUBE[1]["rendimentos"])["id"], server.CLUBE[1]["id"])
+        self.assertEqual(server.nivel(10**12)["id"], server.CLUBE[-1]["id"])
 
     def test_carregar_e_salvar(self):
         acc = server.carregar("teste")

@@ -14,6 +14,12 @@ Há três tipos de investimento, para ensinar a diferença entre eles:
 | Prefixado | taxa travada na aplicação: Selic média esperada pelo **Boletim Focus** (`olinda.bcb.gov.br`) × 105% + prêmio de prazo de 0,5 p.p. | 12 corridas | vende a preço de mercado |
 | IPCA+ | IPCA do mês + juro real travado (`jurosRealIpca`) | 24 corridas | vende a preço de mercado |
 
+**Clube do Investidor.** Os juros que o cofrinho e os investimentos pagam somam nos *rendimentos* da conta (moeda de
+corrida não conta). Eles dão o nível — 🌱 Iniciante, 🐷 Poupador (R$ 200), 📈 Investidor (R$ 800), 👑 Mestre dos Juros
+(R$ 3.000) — e cada nível libera uma skin exclusiva na loja (Cofrinho nas Costas, Levi Esmeralda, Coroa dos Juros
+Compostos). Na loja, cada skin mostra o caminho até ela: quantas corridas parado na conta, no cofrinho ou investindo,
+e quanto do preço os juros pagam; dá para completar a compra com o cofrinho. Níveis e preços ficam no `catalog.json`.
+
 A venda antecipada usa marcação a mercado (juros subiram, o título vale menos; caíram, vale mais). O painel tem um
 simulador "e se a Selic cair/subir 3 p.p." e o guia "Aprenda". Sem saída HTTPS para o Banco Central, vale a última
 taxa gravada ou a reserva do `catalog.json` (`selicReserva`, `ipcaReserva`, `selicEsperadaReserva`), e a tela mostra
@@ -69,7 +75,7 @@ node tools/build_scenery.mjs     # junta os modelos em assets/scenery.glb (+ ver
 | `src/edu/economy.js`, `bank.js` | Carteira da corrida, juros, dívida; taxas em vigor, tipos de investimento, marcação a mercado, cenários e projeções do banco |
 | `src/edu/dicas.js` | Textos da "Dica do Levi", do banco e do guia de renda fixa (para a equipe do PGE Educa revisar) |
 | `src/skins.js` | Pinturas e acessórios do Levi |
-| `src/ui/` | HUD da corrida, menu e extrato, painéis do Banco e da Loja |
+| `src/ui/` | HUD da corrida, menu e extrato, painéis do Banco e da Loja, cartão e trilha do Clube do Investidor |
 | `src/account.js`, `src/api.js`, `src/ranking.js` | Conta no banco, cliente da API, login e ranking |
 | `src/audio.js`, `src/input.js` | Som, teclado e toque |
 | `server.py` | Serve o jogo; login, ranking e o dinheiro (o servidor é quem guarda e confere) |

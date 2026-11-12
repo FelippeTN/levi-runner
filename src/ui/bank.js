@@ -6,8 +6,9 @@ import { store } from "../account.js";
 import {
   aa, cofrinhoRate, marcacao, monthly, poupanca, prefixadoAA, projectRates, RATES, selicPath, taxaHoje, TIPOS,
 } from "../edu/bank.js";
-import { aoAno, GUIA_RENDA_FIXA, inflacao, resgateTexto, SELIC_EXPLICA, selicMudou } from "../edu/dicas.js";
+import { aoAno, GUIA_RENDA_FIXA, inflacao, resgateTexto, SELIC_EXPLICA, selicMudou, subiuTexto } from "../edu/dicas.js";
 import { brl } from "../edu/economy.js";
+import { clubeCard, liberadasPor } from "./clube.js";
 
 const MONTHS = 12;
 const SELIC_SEEN = "levi-selic";
@@ -154,6 +155,8 @@ export function bankPanel(sheet, account, hooks) {
     const t = TIPOS[tipo];
     body.innerHTML = `
       ${gain > 0 ? `<p class="yield">Seu dinheiro rendeu <b data-count="${gain}">${brl(0)}</b> nesta corrida!${r.liberado ? ` · ${brl(r.liberado)} de investimento liberado na conta` : ""}</p>` : ""}
+      ${r?.subiu ? `<p class="yield levelup">${subiuTexto(r.subiu, liberadasPor(r.subiu.id))}</p>` : ""}
+      ${clubeCard(account.rendimentos)}
       ${selicBox(notice)}
       <div class="accounts">
         <article class="acc acc-conta"><h3>CONTA</h3><b>${brl(d.conta)}</b><p>parado, não rende e perde para a inflação · é o que você gasta na loja</p></article>

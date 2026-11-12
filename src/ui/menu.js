@@ -1,7 +1,7 @@
 // Menu de início e fim de jogo: título, extrato da corrida, meta, barra JOGAR | BANCO | LOJA e painéis.
 
-import { RATES, runsText, runsUntil } from "../edu/bank.js";
-import { pickTip } from "../edu/dicas.js";
+import { exigido, RATES, runsText, runsUntil } from "../edu/bank.js";
+import { pickTip, subiuTexto } from "../edu/dicas.js";
 import { brl } from "../edu/economy.js";
 import catalog from "../edu/catalog.json" with { type: "json" };
 import { Phase } from "../game.js";
@@ -96,6 +96,7 @@ export class Menu {
         dep.textContent = r.mes
           ? `+${brl(r.deposito)} na sua conta${yieldText}`
           : `+${brl(r.deposito)} na sua conta · corrida curta: o mês só conta a partir de ${catalog.banco.metrosParaMes} m`;
+        if (r.subiu) dep.textContent += ` · ${subiuTexto(r.subiu, Object.values(SKINS).filter((s) => s.nivel === r.subiu.id))}`;
       })
       .catch((err) => (dep.textContent = `Não deu para guardar: ${err.message}`));
   }
@@ -113,6 +114,15 @@ export class Menu {
     if (d.skins.includes(skin.id)) {
       el.innerHTML = `<b>META CUMPRIDA!</b> ${skin.nome} é sua · escolha outra na loja`;
       el.style.setProperty("--p", "100%");
+      return;
+    }
+    const req = exigido(skin, this.account.rendimentos);
+    if (!req.liberada) {
+      const falta = req.nivel.rendimentos - this.account.rendimentos;
+      el.style.setProperty("--p", `${Math.min(100, (100 * this.account.rendimentos) / req.nivel.rendimentos).toFixed(1)}%`);
+      el.innerHTML =
+        `<b>META: ${skin.nome}</b> 🔒 exclusiva do nível ${req.nivel.selo} ${req.nivel.nome}` +
+        `<small>Faltam <strong>${brl(falta)}</strong> de rendimentos: invista e deixe o dinheiro trabalhar</small>`;
       return;
     }
     const total = this.account.total, per = this.account.perRun;

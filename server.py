@@ -5,6 +5,7 @@ O dinheiro mora aqui: o jogo só mostra. Regras e preços vêm de src/edu/catalo
 Valores em centavos inteiros. Cada corrida de pelo menos `metrosParaMes` conta como um mês de rendimento,
 à taxa Selic do Banco Central (buscada a cada 24 h; sem rede vale a última gravada ou a reserva do catálogo).
 Investimentos: pós-fixado (Selic do mês), prefixado (taxa travada pela expectativa do Boletim Focus) e IPCA+.
+Clube do Investidor: os juros recebidos somam em `rendimentos`, que dá o nível; skins exclusivas pedem um nível.
 Uso: python3 server.py [porta]   (padrão 8042; só biblioteca padrão; LEVI_DB troca o arquivo do banco)
 """
 
@@ -30,6 +31,7 @@ with open(CATALOG_PATH, encoding="utf-8") as f:
     CATALOG = json.load(f)
 BANCO = CATALOG["banco"]
 SKINS = {s["id"]: s for s in CATALOG["skins"]}
+CLUBE = CATALOG["clube"]
 
 db = sqlite3.connect(os.environ.get("LEVI_DB", os.path.join(ROOT, "ranking.db")), check_same_thread=False, isolation_level=None)
 db.executescript("""
@@ -43,12 +45,15 @@ db.executescript("""
         mes integer not null default 0,
         skins text not null default '["classico"]',
         pintura text not null default 'classico',
-        acessorio text
+        acessorio text,
+        rendimentos integer not null default 0
     );
     create table if not exists taxas (serie text primary key, valor real not null, buscado_em integer not null);
 """)
 if "pw" not in [c[1] for c in db.execute("pragma table_info(players)")]:
     db.execute("alter table players add column pw text")  # bancos da versão com LDAP
+if "rendimentos" not in [c[1] for c in db.execute("pragma table_info(contas)")]:
+    db.execute("alter table contas add column rendimentos integer not null default 0")  # bancos de antes do clube
 # reentrante: uma operação no dinheiro segura a trava do ler-mudar-gravar inteiro, e sql() pega de novo
 db_lock = threading.RLock()
 
@@ -229,6 +234,7 @@ def fim_de_corrida(acc, distancia, patrimonio, tx):
         else:
             ativas.append(ap)
     acc["aplicacoes"] = ativas
+    acc["rendimentos"] = acc.get("rendimentos", 0) + resumo["cofrinho"] + resumo["investimento"]
     return resumo
 
 
@@ -286,15 +292,26 @@ def movimentar(acc, acao, valor=None, tipo=None, id=None, tx=None):
         acc["aplicacoes"].append(nova_aplicacao(acc, tipo, valor, tx or taxas()))
 
 
-def comprar(acc, skin_id):
+def nivel(rendimentos):
+    """Nível do Clube do Investidor: o mais alto cujo mínimo de rendimentos já foi alcançado."""
+    return [n for n in CLUBE if rendimentos >= n["rendimentos"]][-1]
+
+
+def comprar(acc, skin_id, cofrinho=False):
+    """Compra com o saldo da conta; com `cofrinho`, o que faltar sai do cofrinho na mesma operação."""
     skin = SKINS.get(skin_id)
     if not skin:
         raise Recusado("Skin desconhecida")
     if skin_id in acc["skins"]:
         raise Recusado("Você já tem essa skin")
-    if acc["conta"] < skin["preco"]:
+    exige = next((n for n in CLUBE if n["id"] == skin.get("nivel")), None)
+    if exige and acc.get("rendimentos", 0) < exige["rendimentos"]:
+        raise Recusado(f"Exclusiva do Clube do Investidor: chegue ao nível {exige['nome']}")
+    falta = max(0, skin["preco"] - acc["conta"])
+    if falta > (acc["cofrinho"] if cofrinho else 0):
         raise Recusado("Saldo na conta insuficiente")
-    acc["conta"] -= skin["preco"]
+    acc["cofrinho"] -= falta
+    acc["conta"] += falta - skin["preco"]
     acc["skins"].append(skin_id)
     vestir(acc, skin_id)
 
@@ -309,7 +326,7 @@ def vestir(acc, skin_id):
     acc["pintura" if SKINS[skin_id]["tipo"] == "pintura" else "acessorio"] = skin_id
 
 
-COLS = ("conta", "cofrinho", "aplicacoes", "mes", "skins", "pintura", "acessorio")
+COLS = ("conta", "cofrinho", "aplicacoes", "mes", "skins", "pintura", "acessorio", "rendimentos")
 
 
 def carregar(login):
@@ -418,7 +435,7 @@ class Handler(SimpleHTTPRequestHandler):
                 elif self.path == "/api/banco":
                     resumo = movimentar(acc, body.get("acao"), body.get("valor"), body.get("tipo"), body.get("id"))
                 elif self.path == "/api/loja":
-                    comprar(acc, body.get("skin"))
+                    comprar(acc, body.get("skin"), body.get("cofrinho") is True)
                 elif self.path == "/api/vestir":
                     vestir(acc, body.get("skin"))
                 else:
